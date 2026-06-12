@@ -28,7 +28,7 @@ class HanaBriefCollector:
 
         try:
             entries = self._fetch_video_entries(channel_id)
-        except DownloadError as exc:
+        except Exception as exc:
             result.error = str(exc)
             return result
 
