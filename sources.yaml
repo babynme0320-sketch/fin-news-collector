@@ -85,7 +85,7 @@ web_sources:
 hana_brief:
   enabled: true
   channel_id: "UCP8KMauNQ5YhTL8fzoSYcfQ"
-  max_videos: 3
+  max_videos: 10
 
 housekeeping:
   retention_days: 10
