@@ -54,6 +54,14 @@ jobs:
           restore-keys: |
             daily-news-${{ env.TODAY_KST }}-
 
+      - name: 속보 캐시 (2일 보관)
+        uses: actions/cache@v4
+        with:
+          path: data/daily_cache/sokbo.json
+          key: sokbo-${{ github.run_id }}
+          restore-keys: |
+            sokbo-
+
       - name: 패키지 설치
         run: pip install -r requirements.txt
 

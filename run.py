@@ -84,6 +84,53 @@ def _merge_into_result(result: CollectorResult, cached: list[dict]) -> None:
     result.items = list(result.items) + existing
 
 
+_SOKBO_CACHE = Path("data") / "daily_cache" / "sokbo.json"
+_SOKBO_TTL = timedelta(days=2)
+
+
+def _load_sokbo_cache() -> list[dict]:
+    if _SOKBO_CACHE.exists():
+        return json.loads(_SOKBO_CACHE.read_text(encoding="utf-8"))
+    return []
+
+
+def _save_sokbo_cache(items: list[dict]) -> None:
+    _SOKBO_CACHE.parent.mkdir(parents=True, exist_ok=True)
+    _SOKBO_CACHE.write_text(json.dumps(items, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def _build_sokbo_result(fresh_articles: list[Article]) -> CollectorResult:
+    now = datetime.now(timezone.utc)
+    cutoff = now - _SOKBO_TTL
+
+    cached = [
+        a for a in _load_sokbo_cache()
+        if datetime.fromisoformat(a["collected_at"]).replace(tzinfo=timezone.utc) > cutoff
+    ]
+
+    existing_urls = {a["url"] for a in cached}
+    for article in fresh_articles:
+        if "[속보]" in article.title and article.url not in existing_urls:
+            cached.append({
+                "title": article.title,
+                "url": article.url,
+                "date": article.date,
+                "lede": article.lede,
+                "source": article.source,
+                "collected_at": now.replace(tzinfo=None).isoformat(),
+            })
+            existing_urls.add(article.url)
+
+    _save_sokbo_cache(cached)
+
+    result = CollectorResult(source_name="속보", kind="section")
+    result.items = [
+        Article(title=a["title"], url=a["url"], date=a["date"], lede=a["lede"], source=a.get("source", ""))
+        for a in reversed(cached)
+    ]
+    return result
+
+
 def _apply_merge_groups(results: list[CollectorResult]) -> list[CollectorResult]:
     merged_out: list[CollectorResult] = []
     consumed: set[str] = set()
@@ -136,6 +183,13 @@ def main() -> Path:
 
     _save_daily_cache(today_kst, daily_cache)
     results = _apply_merge_groups(results)
+
+    # 속보 추출: 병합된 한국경제 결과에서 [속보] 기사 분리
+    hankyung = next((r for r in results if r.source_name == "한국경제"), None)
+    fresh_articles = [a for a in (hankyung.items if hankyung else []) if isinstance(a, Article)]
+    sokbo_result = _build_sokbo_result(fresh_articles)
+    if sokbo_result.items:
+        results.insert(0, sokbo_result)
 
     hana_config = config.get("hana_brief", {})
     if hana_config.get("enabled", True):
