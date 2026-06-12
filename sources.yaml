@@ -67,14 +67,13 @@ web_sources:
     url: "https://www.hankyung.com/opinion"
     type: "articles"
     parser: "html.parser"
-    filter_title_contains: "[사설]"
     selectors:
-      list_container: "div.opinion-list"
-      item: "div.major-news"
-      title: "h2.news-tit a"
-      link: "h2.news-tit a"
+      list_container: "div.opinion-list div.major-news"
+      item: "div.news-item"
+      title: "h2 a"
+      link: "h2 a"
       date: "span.date"
-    max_items: 10
+    max_items: 9
     encoding: "utf-8"
 
   - name: "매일경제 사설"
