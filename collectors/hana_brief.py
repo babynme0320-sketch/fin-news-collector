@@ -67,40 +67,35 @@ class HanaBriefCollector:
         today = date.today()
         reports: list[Report] = []
         candidate = today
-        checked = 0
 
-        while len(reports) < n_days and checked < 30:
-            checked += 1
-            if candidate.weekday() >= 5:  # 주말 제외
-                candidate -= timedelta(days=1)
-                continue
-
-            brief_date_str = candidate.strftime("%y%m%d")
-            # URL 경로 날짜 = 브리프 날짜 - 1일 (전날 저녁 업로드)
-            url_path_date = candidate - timedelta(days=1)
-            pdf_url = (
-                f"{_HANAW_BASE}/"
-                f"{url_path_date.strftime('%Y/%m/%d')}/"
-                f"Daily_{brief_date_str}.pdf"
-            )
-
-            try:
-                resp = requests.head(pdf_url, timeout=(3, 8), allow_redirects=True)
-                if resp.status_code == 200:
-                    try:
-                        local_path = download_pdf(pdf_url, "하나증권")
-                    except Exception:
-                        local_path = ""
-                    reports.append(Report(
-                        title=f"하나증권 모닝브리프 {candidate.strftime('%Y-%m-%d')}",
-                        pdf_url=pdf_url,
-                        local_path=local_path,
-                        date=candidate.strftime("%Y-%m-%d"),
-                        source="하나증권",
-                    ))
-            except Exception:
-                pass
-
+        for _ in range(30):  # 최대 30 캘린더일 소급
+            if len(reports) >= n_days:
+                break
+            if candidate.weekday() < 5:  # 평일만 처리
+                brief_date_str = candidate.strftime("%y%m%d")
+                # URL 경로 날짜 = 브리프 날짜 - 1일 (전날 저녁 업로드)
+                url_path_date = candidate - timedelta(days=1)
+                pdf_url = (
+                    f"{_HANAW_BASE}/"
+                    f"{url_path_date.strftime('%Y/%m/%d')}/"
+                    f"Daily_{brief_date_str}.pdf"
+                )
+                try:
+                    resp = requests.head(pdf_url, timeout=(3, 8), allow_redirects=True)
+                    if resp.status_code == 200:
+                        try:
+                            local_path = download_pdf(pdf_url, "하나증권")
+                        except Exception:
+                            local_path = ""
+                        reports.append(Report(
+                            title=f"하나증권 모닝브리프 {candidate.strftime('%Y-%m-%d')}",
+                            pdf_url=pdf_url,
+                            local_path=local_path,
+                            date=candidate.strftime("%Y-%m-%d"),
+                            source="하나증권",
+                        ))
+                except Exception:
+                    pass
             candidate -= timedelta(days=1)
 
         return reports
