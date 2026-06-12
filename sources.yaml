@@ -47,6 +47,51 @@ web_sources:
     max_items: 8
     encoding: "utf-8"
 
+  - name: "매일경제"
+    enabled: true
+    url: "https://www.mk.co.kr/news/economy/"
+    type: "articles"
+    parser: "html.parser"
+    selectors:
+      list_container: "ul.article_list_bx"
+      item: "li.article_list"
+      title: "h4"
+      link: "a.news_item"
+      lede: "p.art_desc"
+      date: "p.time_info"
+    max_items: 10
+    encoding: "utf-8"
+
+  - name: "한국경제 사설"
+    enabled: true
+    url: "https://www.hankyung.com/opinion"
+    type: "articles"
+    parser: "html.parser"
+    filter_title_contains: "[사설]"
+    selectors:
+      list_container: "div.opinion-list"
+      item: "div.major-news"
+      title: "h2.news-tit a"
+      link: "h2.news-tit a"
+      date: "span.date"
+    max_items: 10
+    encoding: "utf-8"
+
+  - name: "매일경제 사설"
+    enabled: true
+    url: "https://www.mk.co.kr/opinion/editorial/"
+    type: "articles"
+    parser: "html.parser"
+    selectors:
+      list_container: "ul.article_list_bx"
+      item: "li.article_list"
+      title: "h4"
+      link: "a.news_item"
+      lede: "p.art_desc"
+      date: "p.time_info"
+    max_items: 5
+    encoding: "utf-8"
+
   - name: "연준 보고서"
     enabled: true
     url: "https://www.federalreserve.gov/monetarypolicy/fomc.htm"

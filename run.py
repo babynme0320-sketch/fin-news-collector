@@ -18,8 +18,11 @@ from reporter.renderer import render_report
 
 REPORT_DATE_PATTERN = re.compile(r"report_(\d{8})\.html$")
 KST = timezone(timedelta(hours=9))
-ACCUMULATE_SOURCES = {"한국경제", "한국경제 금융·마켓", "한국경제 경제"}
-MERGE_GROUPS = {"한국경제": ["한국경제", "한국경제 금융·마켓", "한국경제 경제"]}
+ACCUMULATE_SOURCES = {"한국경제", "한국경제 금융·마켓", "한국경제 경제", "매일경제"}
+MERGE_GROUPS = {
+    "한국경제": ["한국경제", "한국경제 금융·마켓", "한국경제 경제"],
+    "사설": ["한국경제 사설", "매일경제 사설"],
+}
 
 
 def cleanup_old_outputs(retention_days: int) -> None:

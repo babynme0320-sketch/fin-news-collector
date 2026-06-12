@@ -104,6 +104,10 @@ class WebScraperCollector:
         if not title or not href:
             return None
 
+        filter_text = self.config.get("filter_title_contains")
+        if filter_text and filter_text not in title:
+            return None
+
         raw_date = date_element.get_text(" ", strip=True) if date_element else str(date.today())
         normalized_date = normalize_date(raw_date)
         return title, urljoin(self.config["url"], href), normalized_date
