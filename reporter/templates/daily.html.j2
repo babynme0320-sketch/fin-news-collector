@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>금융 데일리 {{ date }}</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --line: #e2e8f0;
+      --text: #0f172a;
+      --muted: #64748b;
+      --up: #16a34a;
+      --down: #dc2626;
+      --flat: #94a3b8;
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      line-height: 1.5;
+    }
+    main {
+      max-width: 1140px;
+      margin: 0 auto;
+      padding: 32px 20px 48px;
+    }
+    h1, h2, h3, p { margin: 0; }
+    .hero { margin-bottom: 28px; }
+    .subtitle { color: var(--muted); margin-top: 6px; }
+    
+    /* 14개 카드를 위한 반응형 그리드 설계 */
+    .indices {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-top: 16px;
+    }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 16px;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+      transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.22s ease-in-out;
+    }
+    .card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
+    }
+    .card.up { border-left: 5px solid var(--up); }
+    .card.down { border-left: 5px solid var(--down); }
+    .card.flat, .card.na { border-left: 5px solid var(--flat); }
+    
+    .card::after {
+      content: "차트 📊";
+      position: absolute;
+      bottom: 8px;
+      right: 12px;
+      font-size: 11px;
+      color: var(--muted);
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+    .card:hover::after {
+      opacity: 0.8;
+    }
+
+    .label { font-size: 13px; color: var(--muted); font-weight: 500; }
+    .price { font-size: 24px; font-weight: 700; margin: 6px 0 2px; letter-spacing: -0.5px; }
+    .change { font-size: 14px; font-weight: 600; }
+    .change.up { color: var(--up); }
+    .change.down { color: var(--down); }
+    .change.flat { color: var(--flat); }
+    
+    .section {
+      padding: 24px;
+      margin-top: 24px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+    }
+    .section-header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 16px;
+      border-bottom: 2px solid var(--bg);
+      padding-bottom: 10px;
+    }
+    .error {
+      padding: 12px 14px;
+      border-radius: 10px;
+      background: #fef2f2;
+      color: #b91c1c;
+      font-size: 14px;
+    }
+    .empty { color: var(--muted); }
+    
+    .item {
+      padding: 16px;
+      margin-top: 12px;
+      background: var(--bg);
+      border-radius: 12px;
+      border: 1px solid var(--line);
+    }
+    .item-title {
+      color: var(--primary);
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 16px;
+    }
+    .item-title:hover {
+      color: var(--primary-hover);
+      text-decoration: underline;
+    }
+    .meta {
+      color: var(--muted);
+      font-size: 13px;
+      margin-top: 6px;
+    }
+    .lede {
+      margin-top: 8px;
+      color: #334155;
+      font-size: 14.5px;
+      white-space: pre-wrap;
+      line-height: 1.6;
+    }
+    .badge {
+      display: inline-block;
+      margin-left: 8px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: #dbeafe;
+      color: #1d4ed8;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .local-path {
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 12px;
+      word-break: break-all;
+    }
+
+    /* Glassmorphism 차트 모달 레이아웃 */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(15, 23, 42, 0.45);
+      backdrop-filter: blur(6px);
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease-in-out;
+    }
+    .modal-overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .modal-content {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      width: 90%;
+      max-width: 800px;
+      padding: 24px;
+      box-shadow: 0 20px 40px rgba(15, 23, 42, 0.15);
+      transform: scale(0.95);
+      transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .modal-overlay.active .modal-content {
+      transform: scale(1);
+    }
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 18px;
+    }
+    .modal-header h2 {
+      font-size: 20px;
+      font-weight: 700;
+    }
+    .chart-filters {
+      display: flex;
+      gap: 6px;
+    }
+    .filter-btn {
+      background: var(--bg);
+      border: 1px solid var(--line);
+      color: var(--text);
+      padding: 6px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .filter-btn:hover {
+      background: #e2e8f0;
+    }
+    .filter-btn.active {
+      background: var(--primary);
+      color: #ffffff;
+      border-color: var(--primary);
+    }
+    .close-btn {
+      background: none;
+      border: none;
+      font-size: 28px;
+      font-weight: 300;
+      cursor: pointer;
+      color: var(--muted);
+      line-height: 1;
+      padding: 0;
+    }
+    .close-btn:hover {
+      color: var(--text);
+    }
+    #chart-canvas {
+      min-height: 380px;
+      background: var(--surface);
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header class="hero">
+      <h1>금융 데일리</h1>
+      <p class="subtitle">{{ date }} 생성 · 자동 수집 리포트</p>
+    </header>
+
+    <section class="section">
+      <div class="section-header">
+        <h2>📈 주요 증시 & 거시 지표</h2>
+      </div>
+      {% if market_error %}
+      <p class="error">⚠️ 증시 데이터 수집 실패: {{ market_error }}</p>
+      {% elif not indices %}
+      <p class="empty">증시 데이터 없음</p>
+      {% else %}
+      <div class="indices">
+        {% for idx in indices %}
+          {% if not idx.available %}
+          <article class="card na" data-name="{{ idx.name }}">
+            <div class="label">{{ idx.name }}</div>
+            <div class="price">—</div>
+            <div class="change flat">데이터 없음</div>
+          </article>
+          {% else %}
+          {% set direction = "up" if idx.change_pct > 0 else ("down" if idx.change_pct < 0 else "flat") %}
+          <article class="card {{ direction }}" data-name="{{ idx.name }}">
+            <div class="label">{{ idx.name }}</div>
+            <div class="price">{{ "%.2f"|format(idx.price) }}</div>
+            <div class="change {{ direction }}">{{ "+" if idx.change_pct > 0 else "" }}{{ "%.2f"|format(idx.change_pct) }}%</div>
+          </article>
+          {% endif %}
+        {% endfor %}
+      </div>
+      {% endif %}
+    </section>
+
+    {% for section in sections %}
+    <section class="section">
+      <div class="section-header">
+        <h2>{{ section.name }}</h2>
+      </div>
+      {% if section.error %}
+      <p class="error">⚠️ 수집 실패: {{ section.error }}</p>
+      {% elif not section.entries %}
+      <p class="empty">수집된 항목 없음</p>
+      {% else %}
+        {% for item in section.entries %}
+        <article class="item">
+          <a class="item-title" href="{{ item.url }}" target="_blank" rel="noopener noreferrer">{{ item.title }}</a>
+          {% if item.is_pdf %}<span class="badge">PDF</span>{% endif %}
+          <div class="meta">{{ item.date }}</div>
+          {% if item.lede %}<p class="lede">{{ item.lede }}</p>{% endif %}
+          {% if item.local_path %}<div class="local-path">로컬 파일: {{ item.local_path }}</div>{% endif %}
+        </article>
+        {% endfor %}
+      {% endif %}
+    </section>
+    {% endfor %}
+  </main>
+
+  <!-- 차트 팝업 모달 마크업 -->
+  <div id="chart-modal" class="modal-overlay">
+    <div class="modal-content">
+      <header class="modal-header">
+        <h2 id="modal-title">지표 추이</h2>
+        <div class="chart-filters">
+          <button class="filter-btn active" data-period="all">전체 (30년)</button>
+          <button class="filter-btn" data-period="120">10년</button>
+          <button class="filter-btn" data-period="60">5년</button>
+          <button class="filter-btn" data-period="12">1년</button>
+        </div>
+        <button id="close-modal" class="close-btn">&times;</button>
+      </header>
+      <div id="chart-canvas"></div>
+    </div>
+  </div>
+
+  <!-- ApexCharts 라이브러리 탑재 (CDN) -->
+  <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+  <script>
+    // Python Backend에서 주입해준 14개 지표별 30년 월간 종가 데이터 JSON
+    const historyData = {{ history_data | tojson }};
+    
+    let chartInstance = null;
+    let currentData = [];
+    let currentIndexName = "";
+
+    const modal = document.getElementById('chart-modal');
+    const modalTitle = document.getElementById('modal-title');
+    const closeModalBtn = document.getElementById('close-modal');
+    const filterButtons = document.querySelectorAll('.filter-btn');
+
+    // 카드 클릭 이벤트 매핑
+    document.querySelectorAll('.card').forEach(card => {
+      card.addEventListener('click', () => {
+        const indexName = card.getAttribute('data-name');
+        if (historyData && historyData[indexName]) {
+          openChartModal(indexName);
+        }
+      });
+    });
+
+    closeModalBtn.addEventListener('click', closeChartModal);
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) closeChartModal();
+    });
+
+    // 기간 필터 클릭 이벤트 매핑
+    filterButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        filterButtons.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const period = btn.getAttribute('data-period');
+        renderChart(currentIndexName, period);
+      });
+    });
+
+    function openChartModal(indexName) {
+      currentIndexName = indexName;
+      modalTitle.innerText = `${indexName} 30년 장기 추이`;
+      modal.classList.add('active');
+      
+      // 필터 초기화
+      filterButtons.forEach(b => b.classList.remove('active'));
+      document.querySelector('.filter-btn[data-period="all"]').classList.add('active');
+      
+      renderChart(indexName, 'all');
+    }
+
+    function closeChartModal() {
+      modal.classList.remove('active');
+      if (chartInstance) {
+        chartInstance.destroy();
+        chartInstance = null;
+      }
+    }
+
+    function renderChart(indexName, period) {
+      let dataPoints = historyData[indexName] || [];
+      
+      // 다운샘플링 데이터가 있다면 필터 적용
+      if (period !== 'all') {
+        const count = parseInt(period, 10);
+        dataPoints = dataPoints.slice(-count);
+      }
+
+      const categories = dataPoints.map(dp => dp.date);
+      const values = dataPoints.map(dp => dp.value);
+
+      const options = {
+        series: [{
+          name: indexName,
+          data: values
+        }],
+        chart: {
+          type: 'line',
+          height: 380,
+          toolbar: {
+            show: true,
+            tools: {
+              download: true,
+              selection: true,
+              zoom: true,
+              zoomin: true,
+              zoomout: true,
+              pan: true,
+              reset: true
+            }
+          },
+          animations: {
+            enabled: true,
+            easing: 'easeinout',
+            speed: 500
+          }
+        },
+        stroke: {
+          curve: 'smooth',
+          width: 3.5,
+          colors: ['#2563eb']
+        },
+        markers: {
+          size: 0,
+          hover: {
+            size: 6
+          }
+        },
+        grid: {
+          borderColor: '#f1f5f9',
+          row: {
+            colors: ['transparent', 'transparent'],
+            opacity: 0.5
+          }
+        },
+        xaxis: {
+          categories: categories,
+          labels: {
+            style: {
+              colors: '#64748b',
+              fontSize: '11px'
+            },
+            rotate: -30,
+            rotateAlways: false,
+            hideOverlappingLabels: true
+          },
+          tickAmount: 12
+        },
+        yaxis: {
+          labels: {
+            formatter: function (value) {
+              return value.toLocaleString();
+            },
+            style: {
+              colors: '#64748b',
+              fontSize: '11px'
+            }
+          }
+        },
+        tooltip: {
+          x: {
+            show: true
+          },
+          y: {
+            formatter: function (val) {
+              return val.toLocaleString();
+            }
+          }
+        },
+        colors: ['#2563eb']
+      };
+
+      if (chartInstance) {
+        chartInstance.destroy();
+      }
+      
+      chartInstance = new ApexCharts(document.querySelector("#chart-canvas"), options);
+      chartInstance.render();
+    }
+  </script>
+</body>
+</html>

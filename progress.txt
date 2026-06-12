@@ -1,0 +1,14 @@
+fin-news-collector — Ralph progress log
+=======================================
+Session: 2026-06-12
+Plan: .omc/plans/fin-news-collector-plan.md
+
+## Iteration 1
+
+### Starting implementation
+All 13 user stories queued. Implementing in dependency order.
+Architecture: Option C YAML-driven hybrid
+- WebScraperCollector: YAML-driven for 한국경제/연준/KB
+- HanaBriefCollector: yt-dlp for YouTube
+- MarketDataCollector: yfinance
+- Key pattern: CollectorResult.kind discriminator (not r.indices heuristic)

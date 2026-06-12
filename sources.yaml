@@ -1,0 +1,79 @@
+# WebScraperCollector가 이 파일에서 직접 읽어 동작
+# 새 웹/PDF 소스 추가: 이 파일에 항목 추가, 코드 수정 불필요
+
+web_sources:
+  - name: "한국경제"
+    enabled: true
+    url: "https://www.hankyung.com/mr"
+    type: "articles"
+    parser: "html.parser"
+    selectors:
+      list_container: "div.aside-news-module div.news-list"
+      item: "div.news-item"
+      title: "h3.news-tit a"
+      link: "h3.news-tit a"
+      date: "span.date"
+      lede_url: true
+    max_items: 10
+    encoding: "utf-8"
+
+  - name: "연준 보고서"
+    enabled: true
+    url: "https://www.federalreserve.gov/monetarypolicy/fomc.htm"
+    type: "pdf_links"
+    selectors:
+      list_container: "div.panel__fr-consumer-help"
+      item: "ul.clean li"
+      title: "a"
+      link: "a[href$='.pdf']"
+    max_items: 5
+    encoding: "utf-8"
+
+  - name: "KB금융 리서치"
+    enabled: true
+    url: "https://www.kbsec.com/go.able?linkcd=s040203010001"
+    type: "pdf_links"
+    response_format: "json"
+    request_method: "POST"
+    request_data:
+      tab: "1"
+      searchMonth: "1"
+      searchTxt: ""
+      searchFlag: ""
+      pCatfolderid: ""
+      templateid: ""
+      lowTempId: ""
+    items_key: "list"
+    fields:
+      title: "docTitle"
+      link: "urlLink"
+      date: "publicDate"
+    max_items: 10
+    encoding: "utf-8"
+
+# 특수 수집 로직(API/SDK) → 전용 클래스 유지
+hana_brief:
+  enabled: true
+  channel_id: "UCP8KMauNQ5YhTL8fzoSYcfQ"
+  max_videos: 3
+
+housekeeping:
+  retention_days: 10
+
+market_data:
+  enabled: true
+  symbols:
+    - { ticker: "^KS11", name: "KOSPI" }
+    - { ticker: "^KQ11", name: "KOSDAQ" }
+    - { ticker: "^DJI", name: "다우존스" }
+    - { ticker: "^GSPC", name: "S&P 500" }
+    - { ticker: "^IXIC", name: "NASDAQ" }
+    - { ticker: "KR_BOND_3Y", name: "국고채 3년" }
+    - { ticker: "148070.KS", name: "국고채 10년" }
+    - { ticker: "^TNX", name: "미국채 10년" }
+    - { ticker: "^TYX", name: "미국채 30년" }
+    - { ticker: "DX-Y.NYB", name: "달러인덱스" }
+    - { ticker: "CL=F", name: "WTI 원유" }
+    - { ticker: "USDKRW=X", name: "달러/원" }
+    - { ticker: "USDJPY=X", name: "달러/엔" }
+    - { ticker: "EURUSD=X", name: "유로/달러" }
