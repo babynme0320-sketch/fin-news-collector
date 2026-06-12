@@ -34,6 +34,7 @@ def _result_to_section(result: CollectorResult) -> dict:
 
 def render_report(results: list[CollectorResult], output_path: Path) -> None:
     market_result = next((result for result in results if result.kind == "market"), None)
+    econ_result = next((result for result in results if result.kind == "econ"), None)
     section_results = [result for result in results if result.kind == "section"]
     ordered_sections = sorted(
         section_results,
@@ -55,6 +56,8 @@ def render_report(results: list[CollectorResult], output_path: Path) -> None:
         indices=market_result.indices if market_result else [],
         market_error=market_result.error if market_result else None,
         history_data=market_result.history_data if market_result else {},
+        fear_greed=econ_result.fear_greed if econ_result else None,
+        econ_indicators=econ_result.econ_indicators if econ_result else [],
         sections=[_result_to_section(result) for result in ordered_sections],
     )
     output_path.parent.mkdir(parents=True, exist_ok=True)

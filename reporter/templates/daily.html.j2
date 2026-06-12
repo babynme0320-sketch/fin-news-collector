@@ -379,6 +379,70 @@
     }
     #chart-canvas { width: 100%; height: 100%; min-height: 260px; }
 
+    /* ── Fear & Greed ─────────────────────── */
+    .fg-row {
+      display: flex;
+      align-items: center;
+      padding: 14px 16px;
+      border-top: 1px solid var(--line);
+      gap: 14px;
+    }
+    .fg-gauge-wrap { flex: 1; min-width: 0; }
+    .fg-title { font-size: 11px; color: var(--muted); font-weight: 600; margin-bottom: 6px; }
+    .fg-track {
+      height: 6px;
+      border-radius: 3px;
+      background: linear-gradient(to right, #dc2626 0%, #f97316 25%, #eab308 50%, #16a34a 75%, #15803d 100%);
+      position: relative;
+      margin-bottom: 5px;
+    }
+    .fg-thumb {
+      position: absolute;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: 13px; height: 13px;
+      border-radius: 50%;
+      background: var(--surface);
+      border: 2px solid var(--text2);
+    }
+    .fg-prev { font-size: 11px; color: var(--muted); }
+    .fg-score-wrap { text-align: right; flex-shrink: 0; }
+    .fg-score { font-size: 26px; font-weight: 800; letter-spacing: -1px; line-height: 1.1; }
+    .fg-rating { font-size: 11px; font-weight: 700; margin-top: 2px; }
+    .fg-row.extreme-fear .fg-score, .fg-row.extreme-fear .fg-rating { color: #dc2626; }
+    .fg-row.fear .fg-score, .fg-row.fear .fg-rating { color: #f97316; }
+    .fg-row.neutral .fg-score, .fg-row.neutral .fg-rating { color: var(--muted); }
+    .fg-row.greed .fg-score, .fg-row.greed .fg-rating { color: #16a34a; }
+    .fg-row.extreme-greed .fg-score, .fg-row.extreme-greed .fg-rating { color: #15803d; }
+
+    /* ── 경제 지표 ────────────────────────── */
+    .econ-section {
+      background: var(--surface);
+      border-radius: 16px;
+      overflow: hidden;
+      margin-bottom: 12px;
+    }
+    .econ-cards {
+      display: flex;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .econ-cards::-webkit-scrollbar { display: none; }
+    .econ-card {
+      flex-shrink: 0;
+      padding: 14px 16px;
+      border-right: 1px solid var(--line);
+      min-width: 110px;
+    }
+    .econ-card:last-child { border-right: none; }
+    .econ-name { font-size: 11px; color: var(--muted); font-weight: 600; margin-bottom: 4px; white-space: nowrap; }
+    .econ-value { font-size: 20px; font-weight: 700; letter-spacing: -0.5px; }
+    .econ-diff { font-size: 12px; font-weight: 600; margin-top: 2px; }
+    .econ-diff.up { color: var(--up); }
+    .econ-diff.down { color: var(--down); }
+    .econ-diff.flat { color: var(--flat); }
+    .econ-date { font-size: 11px; color: var(--muted); margin-top: 3px; }
+
     /* ── 태블릿 / 데스크탑 ─────────────────── */
     @media (min-width: 600px) {
       main { padding: 16px; max-width: 720px; margin: 0 auto; }
@@ -446,8 +510,47 @@
           {% endif %}
         {% endfor %}
       </div>
+      {% if fear_greed %}
+      {% if fear_greed.score <= 25 %}{% set fg_cls = "extreme-fear" %}{% elif fear_greed.score <= 45 %}{% set fg_cls = "fear" %}{% elif fear_greed.score <= 55 %}{% set fg_cls = "neutral" %}{% elif fear_greed.score <= 75 %}{% set fg_cls = "greed" %}{% else %}{% set fg_cls = "extreme-greed" %}{% endif %}
+      <div class="fg-row {{ fg_cls }}">
+        <div class="fg-gauge-wrap">
+          <div class="fg-title">공포&탐욕 지수 (CNN)</div>
+          <div class="fg-track">
+            <div class="fg-thumb" style="left: {{ fear_greed.score }}%"></div>
+          </div>
+          <div class="fg-prev">전일 {{ fear_greed.prev_close }}</div>
+        </div>
+        <div class="fg-score-wrap">
+          <div class="fg-score">{{ fear_greed.score }}</div>
+          <div class="fg-rating">{{ fear_greed.rating }}</div>
+        </div>
+      </div>
+      {% endif %}
       {% endif %}
     </div>
+
+    {% if econ_indicators %}
+    <div class="econ-section">
+      <div class="section-head">📊 미국 경제 지표</div>
+      <div class="econ-cards">
+        {% for ind in econ_indicators %}
+        <div class="econ-card">
+          <div class="econ-name">{{ ind.name }}</div>
+          {% if ind.value is not none %}
+          <div class="econ-value">{{ "%.2f"|format(ind.value) }}{{ ind.unit }}</div>
+          {% if ind.prev is not none %}
+          {% set diff = ind.value - ind.prev %}
+          <div class="econ-diff {% if diff > 0.005 %}up{% elif diff < -0.005 %}down{% else %}flat{% endif %}">{{ "+" if diff > 0.005 else "" }}{{ "%.2f"|format(diff) }}{{ ind.unit }}</div>
+          {% endif %}
+          <div class="econ-date">{{ ind.date }}</div>
+          {% else %}
+          <div class="econ-value">N/A</div>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
 
     <!-- 뉴스 섹션들 -->
     {% for section in sections %}

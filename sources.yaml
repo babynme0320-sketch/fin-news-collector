@@ -150,3 +150,4 @@ market_data:
     - { ticker: "USDKRW=X", name: "달러/원" }
     - { ticker: "USDJPY=X", name: "달러/엔" }
     - { ticker: "EURUSD=X", name: "유로/달러" }
+    - { ticker: "^VIX", name: "VIX" }

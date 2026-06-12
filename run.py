@@ -11,6 +11,7 @@ import webbrowser
 import yaml
 
 from collectors.base import Article, CollectorResult
+from collectors.econ_indicator import EconIndicatorCollector
 from collectors.hana_brief import HanaBriefCollector
 from collectors.market_data import MarketDataCollector
 from collectors.web_scraper import WebScraperCollector
@@ -201,6 +202,8 @@ def main() -> Path:
     market_config = config.get("market_data", {})
     if market_config.get("enabled", True):
         results.append(MarketDataCollector(market_config).collect())
+
+    results.append(EconIndicatorCollector().collect())
 
     today = date.today().strftime("%Y%m%d")
     output_path = Path("reports") / f"report_{today}.html"

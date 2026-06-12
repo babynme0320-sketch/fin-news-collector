@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import date as date_type
 import re
-from typing import Literal, Optional, Protocol, runtime_checkable
+from typing import Any, Literal, Optional, Protocol, runtime_checkable
 
 
 def normalize_date(raw: str) -> str:
@@ -48,11 +48,13 @@ class MarketIndex:
 @dataclass
 class CollectorResult:
     source_name: str
-    kind: Literal["market", "section"] = "section"
+    kind: Literal["market", "section", "econ"] = "section"
     items: list[Article | Report] = field(default_factory=list)
     indices: list[MarketIndex] = field(default_factory=list)
     history_data: dict[str, list[dict]] = field(default_factory=dict)
     error: Optional[str] = None
+    fear_greed: Optional[dict[str, Any]] = None
+    econ_indicators: list[dict[str, Any]] = field(default_factory=list)
 
 
 @runtime_checkable
