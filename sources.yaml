@@ -23,7 +23,7 @@ web_sources:
     type: "articles"
     parser: "html.parser"
     selectors:
-      list_container: "div.news-item-group"
+      list_container: ""
       item: "div.news-item"
       title: "h2.news-tit a"
       link: "h2.news-tit a"
@@ -38,13 +38,43 @@ web_sources:
     type: "articles"
     parser: "html.parser"
     selectors:
-      list_container: "div.news-item-group"
+      list_container: ""
       item: "div.news-item"
       title: "h2.news-tit a"
       link: "h2.news-tit a"
       date: "p.txt-date"
       lede: "p.lead"
     max_items: 8
+    encoding: "utf-8"
+
+  - name: "CNBC 경제"
+    enabled: true
+    url: "https://www.cnbc.com/id/20910258/device/rss/rss.html"
+    type: "articles"
+    parser: "lxml-xml"
+    selectors:
+      list_container: ""
+      item: "item"
+      title: "title"
+      link: "link"
+      date: "pubDate"
+      lede: "description"
+    max_items: 10
+    encoding: "utf-8"
+
+  - name: "NYT 경제"
+    enabled: true
+    url: "https://rss.nytimes.com/services/xml/rss/nyt/Economy.xml"
+    type: "articles"
+    parser: "lxml-xml"
+    selectors:
+      list_container: ""
+      item: "item"
+      title: "title"
+      link: "guid"
+      date: "pubDate"
+      lede: "description"
+    max_items: 10
     encoding: "utf-8"
 
   - name: "매일경제"
