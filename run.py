@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
+import json
 import os
 from pathlib import Path
 import re
@@ -9,12 +10,16 @@ import webbrowser
 
 import yaml
 
+from collectors.base import Article, CollectorResult
 from collectors.hana_brief import HanaBriefCollector
 from collectors.market_data import MarketDataCollector
 from collectors.web_scraper import WebScraperCollector
 from reporter.renderer import render_report
 
 REPORT_DATE_PATTERN = re.compile(r"report_(\d{8})\.html$")
+KST = timezone(timedelta(hours=9))
+ACCUMULATE_SOURCES = {"한국경제", "한국경제 금융·마켓", "한국경제 경제"}
+MERGE_GROUPS = {"한국경제": ["한국경제", "한국경제 금융·마켓", "한국경제 경제"]}
 
 
 def cleanup_old_outputs(retention_days: int) -> None:
@@ -60,15 +65,77 @@ def _cleanup_report_files(root: Path, cutoff_date: date) -> None:
             entry.unlink()
 
 
+def _load_daily_cache(date_str: str) -> dict[str, list[dict]]:
+    cache_path = Path("data") / "daily_cache" / f"{date_str}.json"
+    if cache_path.exists():
+        return json.loads(cache_path.read_text(encoding="utf-8"))
+    return {}
+
+
+def _save_daily_cache(date_str: str, cache: dict[str, list[dict]]) -> None:
+    cache_path = Path("data") / "daily_cache" / f"{date_str}.json"
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+    cache_path.write_text(json.dumps(cache, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def _merge_into_result(result: CollectorResult, cached: list[dict]) -> None:
+    fresh_urls = {a.url for a in result.items if isinstance(a, Article)}
+    existing = [Article(**d) for d in cached if d["url"] not in fresh_urls]
+    result.items = list(result.items) + existing
+
+
+def _apply_merge_groups(results: list[CollectorResult]) -> list[CollectorResult]:
+    merged_out: list[CollectorResult] = []
+    consumed: set[str] = set()
+    result_map = {r.source_name: r for r in results}
+
+    for group_name, members in MERGE_GROUPS.items():
+        group = [result_map[m] for m in members if m in result_map]
+        if not group:
+            continue
+        merged = CollectorResult(source_name=group_name, kind="section")
+        seen_urls: set[str] = set()
+        for r in group:
+            for item in r.items:
+                url = getattr(item, "url", None) or getattr(item, "pdf_url", None) or ""
+                if url not in seen_urls:
+                    seen_urls.add(url)
+                    merged.items.append(item)
+        merged.error = next((r.error for r in group if r.error), None)
+        merged_out.append(merged)
+        consumed.update(members)
+
+    for r in results:
+        if r.source_name not in consumed:
+            merged_out.append(r)
+    return merged_out
+
+
 def main() -> Path:
     config = yaml.safe_load(Path("sources.yaml").read_text(encoding="utf-8")) or {}
     retention_days = config.get("housekeeping", {}).get("retention_days", 10)
     cleanup_old_outputs(retention_days)
+
+    today_kst = datetime.now(KST).strftime("%Y%m%d")
+    daily_cache = _load_daily_cache(today_kst)
     results = []
 
     for source_config in config.get("web_sources", []):
-        if source_config.get("enabled", True):
-            results.append(WebScraperCollector(source_config).collect())
+        if not source_config.get("enabled", True):
+            continue
+        result = WebScraperCollector(source_config).collect()
+        name = result.source_name
+        if name in ACCUMULATE_SOURCES:
+            cached_articles = daily_cache.get(name, [])
+            _merge_into_result(result, cached_articles)
+            daily_cache[name] = [
+                {"title": a.title, "url": a.url, "date": a.date, "lede": a.lede, "source": a.source}
+                for a in result.items if isinstance(a, Article)
+            ]
+        results.append(result)
+
+    _save_daily_cache(today_kst, daily_cache)
+    results = _apply_merge_groups(results)
 
     hana_config = config.get("hana_brief", {})
     if hana_config.get("enabled", True):

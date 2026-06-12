@@ -7,7 +7,7 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from collectors.base import CollectorResult, Report
 
-SECTION_ORDER = ["한국경제", "한국경제 금융·마켓", "한국경제 경제", "연준 보고서", "KB금융 리서치", "하나증권 모닝브리프"]
+SECTION_ORDER = ["한국경제", "연준 보고서", "KB금융 리서치", "하나증권 모닝브리프"]
 
 
 def _result_to_section(result: CollectorResult) -> dict:

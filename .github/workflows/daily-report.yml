@@ -2,9 +2,14 @@ name: 금융 데일리 리포트
 
 on:
   schedule:
-    - cron: '0 0 * * *'   # 오전 9시 KST (00:00 UTC)
-    - cron: '0 3 * * *'   # 오후 12시 KST (03:00 UTC)
-    - cron: '0 6 * * *'   # 오후 3시 KST (06:00 UTC)
+    - cron: '0 0 * * *'   # 09:00 KST
+    - cron: '0 3 * * *'   # 12:00 KST
+    - cron: '0 6 * * *'   # 15:00 KST
+    - cron: '0 9 * * *'   # 18:00 KST
+    - cron: '0 12 * * *'  # 21:00 KST
+    - cron: '0 15 * * *'  # 00:00 KST
+    - cron: '0 18 * * *'  # 03:00 KST
+    - cron: '0 21 * * *'  # 06:00 KST
   workflow_dispatch:       # 수동 실행 가능
 
 permissions:
@@ -30,6 +35,9 @@ jobs:
           path: ~/.cache/pip
           key: pip-${{ hashFiles('requirements.txt') }}
 
+      - name: KST 날짜 설정
+        run: echo "TODAY_KST=$(TZ=Asia/Seoul date +%Y%m%d)" >> $GITHUB_ENV
+
       - name: 시장 데이터 히스토리 캐시
         uses: actions/cache@v4
         with:
@@ -37,6 +45,14 @@ jobs:
           key: market-history-${{ github.run_id }}
           restore-keys: |
             market-history-
+
+      - name: 일간 뉴스 누적 캐시
+        uses: actions/cache@v4
+        with:
+          path: data/daily_cache
+          key: daily-news-${{ env.TODAY_KST }}-${{ github.run_id }}
+          restore-keys: |
+            daily-news-${{ env.TODAY_KST }}-
 
       - name: 패키지 설치
         run: pip install -r requirements.txt
