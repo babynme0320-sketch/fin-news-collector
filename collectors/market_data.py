@@ -136,9 +136,8 @@ class MarketDataCollector:
             last_date = datetime.strptime(last_date_str, "%Y-%m-%d")
             today = datetime.today()
 
-            if last_date.date() < today.date():
+            if last_date.date() <= today.date():
                 if is_korean_bond:
-                    # 네이버에서 최신 1페이지만 긁어서 업데이트 체크
                     today_records = _scrape_naver_bond(naver_cd, pages=1)
                     for rec in today_records:
                         rec_date = datetime.strptime(rec["Date"], "%Y-%m-%d")
@@ -146,7 +145,8 @@ class MarketDataCollector:
                             new_records.append(rec)
                 else:
                     try:
-                        start_date = last_date + timedelta(days=1)
+                        # 오늘이 이미 캐시에 있으면 오늘부터 재조회 (intraday 갱신)
+                        start_date = last_date if last_date.date() == today.date() else last_date + timedelta(days=1)
                         start_str = start_date.strftime("%Y-%m-%d")
                         with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
                             yf_ticker = yf.Ticker(ticker)
@@ -157,15 +157,11 @@ class MarketDataCollector:
                     except Exception:
                         pass
 
-        combined = existing_data + new_records
-        # 중복 제거 및 정렬
-        seen_dates = set()
-        unique_combined = []
-        for r in combined:
-            if r["Date"] not in seen_dates:
-                seen_dates.add(r["Date"])
-                unique_combined.append(r)
-        unique_combined.sort(key=lambda x: x["Date"])
+        # new_records가 기존 날짜를 덮어쓰도록 최신 데이터 우선 병합
+        date_to_close: dict[str, float] = {r["Date"]: r["Close"] for r in existing_data}
+        for r in new_records:
+            date_to_close[r["Date"]] = r["Close"]
+        unique_combined = [{"Date": d, "Close": c} for d, c in sorted(date_to_close.items())]
 
         # 신규 데이터가 수집되었을 때만 파일에 쓰기 수행
         if new_records:
