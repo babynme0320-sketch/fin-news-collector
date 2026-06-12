@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import itertools
 import re
+from datetime import date, timedelta
 
 import requests
 import yt_dlp
@@ -13,6 +14,7 @@ from .pdf_downloader import download_pdf
 
 YDL_TIMEOUT = 10
 PDF_URL_PATTERN = re.compile(r"https?://[^\s\"')>]+?\.pdf(?:\?[^\s\"')>]*)?", re.IGNORECASE)
+_HANAW_BASE = "https://file.hanaw.com/download/research/FileServer/WEB/info/daily"
 
 
 class HanaBriefCollector:
@@ -21,9 +23,21 @@ class HanaBriefCollector:
 
     def collect(self) -> CollectorResult:
         result = CollectorResult(source_name="하나증권 모닝브리프", kind="section")
+
+        # Primary: stable direct URL construction — no YouTube dependency
+        try:
+            direct_items = self._collect_via_direct_urls()
+        except Exception:
+            direct_items = []
+
+        if direct_items:
+            result.items = direct_items
+            return result
+
+        # Fallback: YouTube RSS / yt-dlp
         channel_id = self.config.get("channel_id", "")
         if not channel_id or channel_id.startswith("REPLACE"):
-            result.error = "channel_id가 설정되지 않음. sources.yaml에서 실제 채널 ID로 변경하세요."
+            result.error = "직접 URL 실패 및 channel_id 미설정"
             return result
 
         try:
@@ -32,7 +46,7 @@ class HanaBriefCollector:
             result.error = str(exc)
             return result
 
-        target_count = self.config.get("max_videos", 10)
+        target_count = self.config.get("max_videos", 5)
         for entry in entries:
             if not self._is_morning_brief_entry(entry):
                 continue
@@ -43,9 +57,53 @@ class HanaBriefCollector:
                 break
 
         if not result.items:
-            result.error = "영상 설명란에서 PDF 링크를 찾지 못함"
+            result.error = "PDF 링크를 찾지 못함"
 
         return result
+
+    def _collect_via_direct_urls(self) -> list[Report]:
+        """최근 영업일 하나증권 PDF URL을 패턴으로 직접 생성 후 검증."""
+        n_days = self.config.get("max_videos", 5)
+        today = date.today()
+        reports: list[Report] = []
+        candidate = today
+        checked = 0
+
+        while len(reports) < n_days and checked < 30:
+            checked += 1
+            if candidate.weekday() >= 5:  # 주말 제외
+                candidate -= timedelta(days=1)
+                continue
+
+            brief_date_str = candidate.strftime("%y%m%d")
+            # URL 경로 날짜 = 브리프 날짜 - 1일 (전날 저녁 업로드)
+            url_path_date = candidate - timedelta(days=1)
+            pdf_url = (
+                f"{_HANAW_BASE}/"
+                f"{url_path_date.strftime('%Y/%m/%d')}/"
+                f"Daily_{brief_date_str}.pdf"
+            )
+
+            try:
+                resp = requests.head(pdf_url, timeout=(3, 8), allow_redirects=True)
+                if resp.status_code == 200:
+                    try:
+                        local_path = download_pdf(pdf_url, "하나증권")
+                    except Exception:
+                        local_path = ""
+                    reports.append(Report(
+                        title=f"하나증권 모닝브리프 {candidate.strftime('%Y-%m-%d')}",
+                        pdf_url=pdf_url,
+                        local_path=local_path,
+                        date=candidate.strftime("%Y-%m-%d"),
+                        source="하나증권",
+                    ))
+            except Exception:
+                pass
+
+            candidate -= timedelta(days=1)
+
+        return reports
 
     def _fetch_video_entries(self, channel_id: str) -> list[dict]:
         feed_url = f"https://www.youtube.com/feeds/videos.xml?channel_id={channel_id}"
@@ -58,20 +116,18 @@ class HanaBriefCollector:
         if response is not None:
             soup = BeautifulSoup(response.text, "xml")
             entries = []
-            scan_limit = self.config.get("feed_scan_limit", self.config.get("max_videos", 10) * 5)
+            scan_limit = self.config.get("feed_scan_limit", self.config.get("max_videos", 5) * 5)
             for entry in soup.find_all("entry")[:scan_limit]:
                 video_id = entry.find("videoId") or entry.find("yt:videoId")
                 title = entry.find("title")
                 published = entry.find("published")
                 description = entry.find("description") or entry.find("media:description")
-                entries.append(
-                    {
-                        "id": video_id.get_text(strip=True) if video_id else "",
-                        "title": title.get_text(strip=True) if title else "모닝브리프",
-                        "upload_date": published.get_text(strip=True) if published else "",
-                        "description": description.get_text("\n", strip=True) if description else "",
-                    }
-                )
+                entries.append({
+                    "id": video_id.get_text(strip=True) if video_id else "",
+                    "title": title.get_text(strip=True) if title else "모닝브리프",
+                    "upload_date": published.get_text(strip=True) if published else "",
+                    "description": description.get_text("\n", strip=True) if description else "",
+                })
             if entries:
                 return entries
 
@@ -79,7 +135,7 @@ class HanaBriefCollector:
             "quiet": True,
             "no_warnings": True,
             "extract_flat": True,
-            "playlistend": self.config.get("feed_scan_limit", self.config.get("max_videos", 10) * 5),
+            "playlistend": self.config.get("feed_scan_limit", self.config.get("max_videos", 5) * 5),
             "socket_timeout": YDL_TIMEOUT,
         }
         with yt_dlp.YoutubeDL(options) as ydl:
@@ -127,22 +183,17 @@ class HanaBriefCollector:
             if pdf_url in seen_urls:
                 continue
             seen_urls.add(pdf_url)
-
             try:
                 local_path = download_pdf(pdf_url, "하나증권")
             except requests.RequestException:
                 local_path = ""
-
-            reports.append(
-                Report(
-                    title=title,
-                    pdf_url=pdf_url,
-                    local_path=local_path,
-                    date=upload_date,
-                    source="하나증권",
-                )
-            )
-
+            reports.append(Report(
+                title=title,
+                pdf_url=pdf_url,
+                local_path=local_path,
+                date=upload_date,
+                source="하나증권",
+            ))
         return reports
 
     def _extract_comment_text(self, video_id: str) -> str:
@@ -171,15 +222,13 @@ class HanaBriefCollector:
 
         comments = comment_data.get("comments") or []
         preferred_comments = [
-            comment
-            for comment in comments
-            if comment.get("author_is_uploader") or comment.get("is_pinned")
+            c for c in comments
+            if c.get("author_is_uploader") or c.get("is_pinned")
         ]
         for comment in itertools.chain(preferred_comments, comments):
             text = comment.get("text", "")
             if "file.hanaw.com" in text or "hanaw.com/main/research" in text:
                 return text
-
         return ""
 
     def _fetch_video_detail(self, video_id: str) -> dict:

@@ -2,7 +2,9 @@ name: 금융 데일리 리포트
 
 on:
   schedule:
-    - cron: '0 22 * * *'  # 매일 오전 7시 KST (22:00 UTC)
+    - cron: '0 0 * * *'   # 오전 9시 KST (00:00 UTC)
+    - cron: '0 3 * * *'   # 오후 12시 KST (03:00 UTC)
+    - cron: '0 6 * * *'   # 오후 3시 KST (06:00 UTC)
   workflow_dispatch:       # 수동 실행 가능
 
 permissions:

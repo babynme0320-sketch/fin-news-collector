@@ -17,6 +17,36 @@ web_sources:
     max_items: 10
     encoding: "utf-8"
 
+  - name: "한국경제 금융·마켓"
+    enabled: true
+    url: "https://www.hankyung.com/financial-market"
+    type: "articles"
+    parser: "html.parser"
+    selectors:
+      list_container: "div.news-item-group"
+      item: "div.news-item"
+      title: "h2.news-tit a"
+      link: "h2.news-tit a"
+      date: "p.txt-date"
+      lede: "p.lead"
+    max_items: 8
+    encoding: "utf-8"
+
+  - name: "한국경제 경제"
+    enabled: true
+    url: "https://www.hankyung.com/economy"
+    type: "articles"
+    parser: "html.parser"
+    selectors:
+      list_container: "div.news-item-group"
+      item: "div.news-item"
+      title: "h2.news-tit a"
+      link: "h2.news-tit a"
+      date: "p.txt-date"
+      lede: "p.lead"
+    max_items: 8
+    encoding: "utf-8"
+
   - name: "연준 보고서"
     enabled: true
     url: "https://www.federalreserve.gov/monetarypolicy/fomc.htm"
@@ -69,7 +99,6 @@ market_data:
     - { ticker: "^GSPC", name: "S&P 500" }
     - { ticker: "^IXIC", name: "NASDAQ" }
     - { ticker: "KR_BOND_3Y", name: "국고채 3년" }
-    - { ticker: "148070.KS", name: "국고채 10년" }
     - { ticker: "^TNX", name: "미국채 10년" }
     - { ticker: "^TYX", name: "미국채 30년" }
     - { ticker: "DX-Y.NYB", name: "달러인덱스" }
