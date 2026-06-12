@@ -2,479 +2,559 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>금융 데일리 {{ date }}</title>
   <style>
     :root {
-      color-scheme: light;
-      --bg: #f8fafc;
+      --bg: #f1f5f9;
       --surface: #ffffff;
+      --surface2: #f8fafc;
       --line: #e2e8f0;
       --text: #0f172a;
+      --text2: #334155;
       --muted: #64748b;
       --up: #16a34a;
+      --up-bg: #f0fdf4;
       --down: #dc2626;
+      --down-bg: #fef2f2;
       --flat: #94a3b8;
       --primary: #2563eb;
-      --primary-hover: #1d4ed8;
+      --primary-light: #eff6ff;
+      --nav-h: 48px;
+      --safe-top: env(safe-area-inset-top, 0px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
     }
-    * { box-sizing: border-box; }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0f172a;
+        --surface: #1e293b;
+        --surface2: #0f172a;
+        --line: #334155;
+        --text: #f1f5f9;
+        --text2: #cbd5e1;
+        --muted: #94a3b8;
+        --up-bg: #052e16;
+        --down-bg: #450a0a;
+        --primary-light: #1e3a5f;
+      }
+    }
+
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
     body {
       margin: 0;
       background: var(--bg);
       color: var(--text);
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-      line-height: 1.5;
-    }
-    main {
-      max-width: 1140px;
-      margin: 0 auto;
-      padding: 32px 20px 48px;
-    }
-    h1, h2, h3, p { margin: 0; }
-    .hero { margin-bottom: 28px; }
-    .subtitle { color: var(--muted); margin-top: 6px; }
-    
-    /* 14개 카드를 위한 반응형 그리드 설계 */
-    .indices {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 16px;
-      margin-top: 16px;
-    }
-    .card {
-      background: var(--surface);
-      border: 1px solid var(--line);
-      border-radius: 14px;
-      padding: 16px;
-      cursor: pointer;
-      position: relative;
-      overflow: hidden;
-      transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.22s ease-in-out;
-    }
-    .card:hover {
-      transform: translateY(-4px);
-      box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
-    }
-    .card.up { border-left: 5px solid var(--up); }
-    .card.down { border-left: 5px solid var(--down); }
-    .card.flat, .card.na { border-left: 5px solid var(--flat); }
-    
-    .card::after {
-      content: "차트 📊";
-      position: absolute;
-      bottom: 8px;
-      right: 12px;
-      font-size: 11px;
-      color: var(--muted);
-      opacity: 0;
-      transition: opacity 0.2s ease;
-    }
-    .card:hover::after {
-      opacity: 0.8;
+      font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo",
+                   "Noto Sans KR", "Malgun Gothic", sans-serif;
+      font-size: 15px;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      padding-bottom: calc(16px + var(--safe-bottom));
     }
 
-    .label { font-size: 13px; color: var(--muted); font-weight: 500; }
-    .price { font-size: 24px; font-weight: 700; margin: 6px 0 2px; letter-spacing: -0.5px; }
-    .change { font-size: 14px; font-weight: 600; }
-    .change.up { color: var(--up); }
-    .change.down { color: var(--down); }
-    .change.flat { color: var(--flat); }
-    
-    .section {
-      padding: 24px;
-      margin-top: 24px;
+    /* ── 상단 헤더 ──────────────────────────── */
+    .topbar {
       background: var(--surface);
-      border: 1px solid var(--line);
-      border-radius: 16px;
+      border-bottom: 1px solid var(--line);
+      padding: calc(12px + var(--safe-top)) 16px 12px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
     }
-    .section-header {
+    .topbar-inner {
       display: flex;
       align-items: baseline;
-      justify-content: space-between;
-      gap: 12px;
-      margin-bottom: 16px;
-      border-bottom: 2px solid var(--bg);
-      padding-bottom: 10px;
+      gap: 10px;
     }
-    .error {
-      padding: 12px 14px;
-      border-radius: 10px;
-      background: #fef2f2;
-      color: #b91c1c;
-      font-size: 14px;
+    .topbar h1 {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
     }
-    .empty { color: var(--muted); }
-    
-    .item {
-      padding: 16px;
-      margin-top: 12px;
-      background: var(--bg);
-      border-radius: 12px;
-      border: 1px solid var(--line);
-    }
-    .item-title {
-      color: var(--primary);
-      text-decoration: none;
-      font-weight: 600;
-      font-size: 16px;
-    }
-    .item-title:hover {
-      color: var(--primary-hover);
-      text-decoration: underline;
-    }
-    .meta {
-      color: var(--muted);
-      font-size: 13px;
-      margin-top: 6px;
-    }
-    .lede {
-      margin-top: 8px;
-      color: #334155;
-      font-size: 14.5px;
-      white-space: pre-wrap;
-      line-height: 1.6;
-    }
-    .badge {
-      display: inline-block;
-      margin-left: 8px;
-      padding: 2px 8px;
-      border-radius: 999px;
-      background: #dbeafe;
-      color: #1d4ed8;
-      font-size: 11px;
-      font-weight: 600;
-    }
-    .local-path {
-      margin-top: 6px;
-      color: var(--muted);
+    .topbar .date-label {
       font-size: 12px;
-      word-break: break-all;
+      color: var(--muted);
+      white-space: nowrap;
     }
 
-    /* Glassmorphism 차트 모달 레이아웃 */
-    .modal-overlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(15, 23, 42, 0.45);
-      backdrop-filter: blur(6px);
-      z-index: 1000;
+    /* ── 섹션 탭 네비 ──────────────────────── */
+    .nav-tabs {
+      display: flex;
+      overflow-x: auto;
+      scrollbar-width: none;
+      gap: 4px;
+      padding: 8px 12px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--line);
+      position: sticky;
+      top: calc(var(--safe-top) + 48px);
+      z-index: 99;
+    }
+    .nav-tabs::-webkit-scrollbar { display: none; }
+    .nav-tab {
+      flex-shrink: 0;
+      padding: 6px 14px;
+      border-radius: 20px;
+      border: 1px solid var(--line);
+      background: var(--bg);
+      color: var(--text2);
+      font-size: 13px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: background 0.15s, color 0.15s;
+      white-space: nowrap;
+    }
+    .nav-tab:active {
+      background: var(--primary);
+      color: #fff;
+      border-color: var(--primary);
+    }
+
+    /* ── 메인 레이아웃 ─────────────────────── */
+    main { padding: 12px 12px 8px; }
+
+    /* ── 시장 지표 그리드 ──────────────────── */
+    .market-section {
+      background: var(--surface);
+      border-radius: 16px;
+      overflow: hidden;
+      margin-bottom: 12px;
+    }
+    .section-head {
+      padding: 14px 16px 10px;
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--muted);
+      letter-spacing: 0.3px;
+      text-transform: uppercase;
+      border-bottom: 1px solid var(--line);
+    }
+    .indices {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0;
+    }
+    .card {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--line);
+      border-right: 1px solid var(--line);
+      cursor: pointer;
+      transition: background 0.15s;
+      position: relative;
+    }
+    .card:active { background: var(--surface2); }
+    /* 짝수 열은 right border 없음 */
+    .card:nth-child(2n) { border-right: none; }
+    /* 마지막 행 border-bottom 제거 */
+    .card:nth-last-child(-n+2) { border-bottom: none; }
+    /* 홀수 마지막 하나 */
+    .card:last-child:nth-child(odd) {
+      grid-column: 1 / -1;
+      border-right: none;
+    }
+    .card.up  { background: var(--up-bg); }
+    .card.down { background: var(--down-bg); }
+    .card.na  { opacity: 0.6; }
+
+    .card-label { font-size: 11px; color: var(--muted); font-weight: 600; margin-bottom: 4px; }
+    .card-price { font-size: 18px; font-weight: 700; letter-spacing: -0.5px; line-height: 1.2; }
+    .card-change { font-size: 13px; font-weight: 600; margin-top: 3px; }
+    .card-change.up   { color: var(--up); }
+    .card-change.down { color: var(--down); }
+    .card-change.flat { color: var(--flat); }
+    .chart-hint {
+      position: absolute;
+      top: 10px; right: 10px;
+      font-size: 14px;
+      opacity: 0.3;
+    }
+
+    /* ── 뉴스 섹션 ─────────────────────────── */
+    .news-section {
+      background: var(--surface);
+      border-radius: 16px;
+      overflow: hidden;
+      margin-bottom: 12px;
+      scroll-margin-top: calc(var(--safe-top) + var(--nav-h) + 60px);
+    }
+    .news-section .section-head {
       display: flex;
       align-items: center;
-      justify-content: center;
+      justify-content: space-between;
+    }
+    .item-count {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--muted);
+      background: var(--bg);
+      padding: 2px 8px;
+      border-radius: 10px;
+      text-transform: none;
+    }
+
+    .news-item {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--line);
+      transition: background 0.12s;
+    }
+    .news-item:last-child { border-bottom: none; }
+    .news-item:active { background: var(--surface2); }
+
+    .item-link {
+      display: block;
+      color: var(--text);
+      text-decoration: none;
+      font-size: 15px;
+      font-weight: 600;
+      line-height: 1.45;
+    }
+    .item-link:active { color: var(--primary); }
+
+    .item-meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 4px;
+    }
+    .item-date { font-size: 12px; color: var(--muted); }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      padding: 1px 7px;
+      border-radius: 999px;
+      background: var(--primary-light);
+      color: var(--primary);
+      font-size: 11px;
+      font-weight: 700;
+    }
+    .item-lede {
+      margin-top: 6px;
+      color: var(--text2);
+      font-size: 13.5px;
+      line-height: 1.55;
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .error-msg {
+      padding: 14px 16px;
+      color: #b91c1c;
+      font-size: 14px;
+      background: var(--down-bg);
+    }
+    .empty-msg {
+      padding: 14px 16px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    /* ── 차트 모달 (모바일 풀스크린) ─────────── */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      backdrop-filter: blur(4px);
+      z-index: 200;
+      display: flex;
+      align-items: flex-end;
       opacity: 0;
       pointer-events: none;
-      transition: opacity 0.25s ease-in-out;
+      transition: opacity 0.2s ease;
     }
     .modal-overlay.active {
       opacity: 1;
       pointer-events: auto;
     }
-    .modal-content {
+    .modal-sheet {
       background: var(--surface);
-      border: 1px solid var(--line);
-      border-radius: 20px;
-      width: 90%;
-      max-width: 800px;
-      padding: 24px;
-      box-shadow: 0 20px 40px rgba(15, 23, 42, 0.15);
-      transform: scale(0.95);
-      transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      border-radius: 20px 20px 0 0;
+      width: 100%;
+      max-height: 88vh;
+      padding: 0 0 calc(16px + var(--safe-bottom));
+      transform: translateY(100%);
+      transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
     }
-    .modal-overlay.active .modal-content {
-      transform: scale(1);
+    .modal-overlay.active .modal-sheet {
+      transform: translateY(0);
+    }
+    .sheet-handle {
+      width: 36px; height: 4px;
+      background: var(--line);
+      border-radius: 2px;
+      margin: 10px auto 0;
+      flex-shrink: 0;
     }
     .modal-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-bottom: 18px;
+      padding: 14px 16px 10px;
+      border-bottom: 1px solid var(--line);
+      flex-shrink: 0;
     }
-    .modal-header h2 {
+    .modal-header h2 { font-size: 16px; font-weight: 700; margin: 0; }
+    .close-btn {
+      background: var(--bg);
+      border: none;
+      width: 32px; height: 32px;
+      border-radius: 50%;
       font-size: 20px;
-      font-weight: 700;
+      cursor: pointer;
+      color: var(--muted);
+      display: flex; align-items: center; justify-content: center;
+      padding: 0;
     }
     .chart-filters {
       display: flex;
       gap: 6px;
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--line);
+      flex-shrink: 0;
+      overflow-x: auto;
+      scrollbar-width: none;
     }
+    .chart-filters::-webkit-scrollbar { display: none; }
     .filter-btn {
+      flex-shrink: 0;
       background: var(--bg);
       border: 1px solid var(--line);
-      color: var(--text);
-      padding: 6px 14px;
+      color: var(--text2);
+      padding: 7px 16px;
       border-radius: 8px;
       font-size: 13px;
       font-weight: 600;
       cursor: pointer;
-      transition: all 0.2s ease;
-    }
-    .filter-btn:hover {
-      background: #e2e8f0;
+      min-height: 36px;
     }
     .filter-btn.active {
       background: var(--primary);
-      color: #ffffff;
+      color: #fff;
       border-color: var(--primary);
     }
-    .close-btn {
-      background: none;
-      border: none;
-      font-size: 28px;
-      font-weight: 300;
-      cursor: pointer;
-      color: var(--muted);
-      line-height: 1;
-      padding: 0;
+    .chart-wrap {
+      flex: 1;
+      overflow: hidden;
+      padding: 4px 8px 0;
     }
-    .close-btn:hover {
-      color: var(--text);
+    #chart-canvas { width: 100%; height: 100%; min-height: 260px; }
+
+    /* ── 태블릿 / 데스크탑 ─────────────────── */
+    @media (min-width: 600px) {
+      main { padding: 16px; max-width: 720px; margin: 0 auto; }
+      .indices { grid-template-columns: repeat(3, 1fr); }
+      .modal-overlay { align-items: center; }
+      .modal-sheet {
+        border-radius: 20px;
+        max-width: 680px;
+        max-height: 80vh;
+        margin: auto;
+      }
+      .sheet-handle { display: none; }
     }
-    #chart-canvas {
-      min-height: 380px;
-      background: var(--surface);
+    @media (min-width: 900px) {
+      main { max-width: 900px; }
+      .indices { grid-template-columns: repeat(4, 1fr); }
     }
   </style>
 </head>
 <body>
-  <main>
-    <header class="hero">
-      <h1>금융 데일리</h1>
-      <p class="subtitle">{{ date }} 생성 · 자동 수집 리포트</p>
-    </header>
 
-    <section class="section">
-      <div class="section-header">
-        <h2>📈 주요 증시 & 거시 지표</h2>
-      </div>
+  <!-- 상단 헤더 -->
+  <div class="topbar">
+    <div class="topbar-inner">
+      <h1>금융 데일리</h1>
+      <span class="date-label">{{ date }}</span>
+    </div>
+  </div>
+
+  <!-- 섹션 탭 네비 -->
+  <nav class="nav-tabs">
+    <a class="nav-tab" href="#market">📈 증시</a>
+    {% for section in sections %}
+    <a class="nav-tab" href="#sec-{{ loop.index }}">{{ section.name }}</a>
+    {% endfor %}
+  </nav>
+
+  <main>
+
+    <!-- 시장 지표 -->
+    <div class="market-section" id="market">
+      <div class="section-head">📈 주요 증시 & 거시 지표</div>
       {% if market_error %}
-      <p class="error">⚠️ 증시 데이터 수집 실패: {{ market_error }}</p>
+      <div class="error-msg">⚠️ 증시 데이터 수집 실패: {{ market_error }}</div>
       {% elif not indices %}
-      <p class="empty">증시 데이터 없음</p>
+      <div class="empty-msg">증시 데이터 없음</div>
       {% else %}
       <div class="indices">
         {% for idx in indices %}
           {% if not idx.available %}
-          <article class="card na" data-name="{{ idx.name }}">
-            <div class="label">{{ idx.name }}</div>
-            <div class="price">—</div>
-            <div class="change flat">데이터 없음</div>
-          </article>
+          <div class="card na" data-name="{{ idx.name }}">
+            <div class="chart-hint">📊</div>
+            <div class="card-label">{{ idx.name }}</div>
+            <div class="card-price">—</div>
+            <div class="card-change flat">데이터 없음</div>
+          </div>
           {% else %}
-          {% set direction = "up" if idx.change_pct > 0 else ("down" if idx.change_pct < 0 else "flat") %}
-          <article class="card {{ direction }}" data-name="{{ idx.name }}">
-            <div class="label">{{ idx.name }}</div>
-            <div class="price">{{ "%.2f"|format(idx.price) }}</div>
-            <div class="change {{ direction }}">{{ "+" if idx.change_pct > 0 else "" }}{{ "%.2f"|format(idx.change_pct) }}%</div>
-          </article>
+          {% set dir = "up" if idx.change_pct > 0 else ("down" if idx.change_pct < 0 else "flat") %}
+          <div class="card {{ dir }}" data-name="{{ idx.name }}">
+            <div class="chart-hint">📊</div>
+            <div class="card-label">{{ idx.name }}</div>
+            <div class="card-price">{{ "%.2f"|format(idx.price) }}</div>
+            <div class="card-change {{ dir }}">{{ "+" if idx.change_pct > 0 else "" }}{{ "%.2f"|format(idx.change_pct) }}%</div>
+          </div>
           {% endif %}
         {% endfor %}
       </div>
       {% endif %}
-    </section>
+    </div>
 
+    <!-- 뉴스 섹션들 -->
     {% for section in sections %}
-    <section class="section">
-      <div class="section-header">
-        <h2>{{ section.name }}</h2>
+    <div class="news-section" id="sec-{{ loop.index }}">
+      <div class="section-head">
+        {{ section.name }}
+        {% if section.entries %}<span class="item-count">{{ section.entries | length }}건</span>{% endif %}
       </div>
       {% if section.error %}
-      <p class="error">⚠️ 수집 실패: {{ section.error }}</p>
+      <div class="error-msg">⚠️ 수집 실패: {{ section.error }}</div>
       {% elif not section.entries %}
-      <p class="empty">수집된 항목 없음</p>
+      <div class="empty-msg">수집된 항목 없음</div>
       {% else %}
         {% for item in section.entries %}
-        <article class="item">
-          <a class="item-title" href="{{ item.url }}" target="_blank" rel="noopener noreferrer">{{ item.title }}</a>
-          {% if item.is_pdf %}<span class="badge">PDF</span>{% endif %}
-          <div class="meta">{{ item.date }}</div>
-          {% if item.lede %}<p class="lede">{{ item.lede }}</p>{% endif %}
-          {% if item.local_path %}<div class="local-path">로컬 파일: {{ item.local_path }}</div>{% endif %}
-        </article>
+        <div class="news-item">
+          <a class="item-link" href="{{ item.url }}" target="_blank" rel="noopener noreferrer">{{ item.title }}</a>
+          <div class="item-meta">
+            {% if item.date %}<span class="item-date">{{ item.date }}</span>{% endif %}
+            {% if item.is_pdf %}<span class="badge">PDF</span>{% endif %}
+          </div>
+          {% if item.lede %}<p class="item-lede">{{ item.lede }}</p>{% endif %}
+        </div>
         {% endfor %}
       {% endif %}
-    </section>
+    </div>
     {% endfor %}
+
   </main>
 
-  <!-- 차트 팝업 모달 마크업 -->
+  <!-- 차트 모달 (바텀 시트) -->
   <div id="chart-modal" class="modal-overlay">
-    <div class="modal-content">
-      <header class="modal-header">
+    <div class="modal-sheet">
+      <div class="sheet-handle"></div>
+      <div class="modal-header">
         <h2 id="modal-title">지표 추이</h2>
-        <div class="chart-filters">
-          <button class="filter-btn active" data-period="all">전체 (30년)</button>
-          <button class="filter-btn" data-period="120">10년</button>
-          <button class="filter-btn" data-period="60">5년</button>
-          <button class="filter-btn" data-period="12">1년</button>
-        </div>
         <button id="close-modal" class="close-btn">&times;</button>
-      </header>
-      <div id="chart-canvas"></div>
+      </div>
+      <div class="chart-filters">
+        <button class="filter-btn active" data-period="all">전체</button>
+        <button class="filter-btn" data-period="120">10년</button>
+        <button class="filter-btn" data-period="60">5년</button>
+        <button class="filter-btn" data-period="12">1년</button>
+      </div>
+      <div class="chart-wrap">
+        <div id="chart-canvas"></div>
+      </div>
     </div>
   </div>
 
-  <!-- ApexCharts 라이브러리 탑재 (CDN) -->
   <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
   <script>
-    // Python Backend에서 주입해준 14개 지표별 30년 월간 종가 데이터 JSON
     const historyData = {{ history_data | tojson }};
-    
     let chartInstance = null;
-    let currentData = [];
     let currentIndexName = "";
 
     const modal = document.getElementById('chart-modal');
     const modalTitle = document.getElementById('modal-title');
-    const closeModalBtn = document.getElementById('close-modal');
-    const filterButtons = document.querySelectorAll('.filter-btn');
+    const closeBtn = document.getElementById('close-modal');
+    const filterBtns = document.querySelectorAll('.filter-btn');
 
-    // 카드 클릭 이벤트 매핑
     document.querySelectorAll('.card').forEach(card => {
       card.addEventListener('click', () => {
-        const indexName = card.getAttribute('data-name');
-        if (historyData && historyData[indexName]) {
-          openChartModal(indexName);
-        }
+        const name = card.dataset.name;
+        if (historyData && historyData[name]) openModal(name);
       });
     });
 
-    closeModalBtn.addEventListener('click', closeChartModal);
-    modal.addEventListener('click', (e) => {
-      if (e.target === modal) closeChartModal();
-    });
+    closeBtn.addEventListener('click', closeModal);
+    modal.addEventListener('click', e => { if (e.target === modal) closeModal(); });
 
-    // 기간 필터 클릭 이벤트 매핑
-    filterButtons.forEach(btn => {
+    filterBtns.forEach(btn => {
       btn.addEventListener('click', () => {
-        filterButtons.forEach(b => b.classList.remove('active'));
+        filterBtns.forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
-        const period = btn.getAttribute('data-period');
-        renderChart(currentIndexName, period);
+        renderChart(currentIndexName, btn.dataset.period);
       });
     });
 
-    function openChartModal(indexName) {
-      currentIndexName = indexName;
-      modalTitle.innerText = `${indexName} 30년 장기 추이`;
+    function openModal(name) {
+      currentIndexName = name;
+      modalTitle.textContent = name + ' 장기 추이';
       modal.classList.add('active');
-      
-      // 필터 초기화
-      filterButtons.forEach(b => b.classList.remove('active'));
+      filterBtns.forEach(b => b.classList.remove('active'));
       document.querySelector('.filter-btn[data-period="all"]').classList.add('active');
-      
-      renderChart(indexName, 'all');
+      renderChart(name, 'all');
     }
 
-    function closeChartModal() {
+    function closeModal() {
       modal.classList.remove('active');
-      if (chartInstance) {
-        chartInstance.destroy();
-        chartInstance = null;
-      }
+      if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
     }
 
-    function renderChart(indexName, period) {
-      let dataPoints = historyData[indexName] || [];
-      
-      // 다운샘플링 데이터가 있다면 필터 적용
-      if (period !== 'all') {
-        const count = parseInt(period, 10);
-        dataPoints = dataPoints.slice(-count);
-      }
+    function renderChart(name, period) {
+      let pts = historyData[name] || [];
+      if (period !== 'all') pts = pts.slice(-parseInt(period, 10));
 
-      const categories = dataPoints.map(dp => dp.date);
-      const values = dataPoints.map(dp => dp.value);
+      const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const textColor = isDark ? '#94a3b8' : '#64748b';
+      const gridColor = isDark ? '#334155' : '#f1f5f9';
 
-      const options = {
-        series: [{
-          name: indexName,
-          data: values
-        }],
+      const opts = {
+        series: [{ name, data: pts.map(d => d.value) }],
         chart: {
           type: 'line',
-          height: 380,
-          toolbar: {
-            show: true,
-            tools: {
-              download: true,
-              selection: true,
-              zoom: true,
-              zoomin: true,
-              zoomout: true,
-              pan: true,
-              reset: true
-            }
-          },
-          animations: {
-            enabled: true,
-            easing: 'easeinout',
-            speed: 500
-          }
+          height: document.getElementById('chart-canvas').clientHeight || 260,
+          background: 'transparent',
+          toolbar: { show: false },
+          animations: { enabled: true, speed: 400 }
         },
-        stroke: {
-          curve: 'smooth',
-          width: 3.5,
-          colors: ['#2563eb']
-        },
-        markers: {
-          size: 0,
-          hover: {
-            size: 6
-          }
-        },
-        grid: {
-          borderColor: '#f1f5f9',
-          row: {
-            colors: ['transparent', 'transparent'],
-            opacity: 0.5
-          }
-        },
+        theme: { mode: isDark ? 'dark' : 'light' },
+        stroke: { curve: 'smooth', width: 2.5, colors: ['#2563eb'] },
+        markers: { size: 0, hover: { size: 5 } },
+        grid: { borderColor: gridColor },
         xaxis: {
-          categories: categories,
+          categories: pts.map(d => d.date),
           labels: {
-            style: {
-              colors: '#64748b',
-              fontSize: '11px'
-            },
+            style: { colors: textColor, fontSize: '10px' },
             rotate: -30,
-            rotateAlways: false,
             hideOverlappingLabels: true
           },
-          tickAmount: 12
+          tickAmount: window.innerWidth < 500 ? 6 : 12
         },
         yaxis: {
           labels: {
-            formatter: function (value) {
-              return value.toLocaleString();
-            },
-            style: {
-              colors: '#64748b',
-              fontSize: '11px'
-            }
+            formatter: v => v.toLocaleString(),
+            style: { colors: textColor, fontSize: '10px' }
           }
         },
         tooltip: {
-          x: {
-            show: true
-          },
-          y: {
-            formatter: function (val) {
-              return val.toLocaleString();
-            }
-          }
+          y: { formatter: v => v.toLocaleString() }
         },
         colors: ['#2563eb']
       };
 
-      if (chartInstance) {
-        chartInstance.destroy();
-      }
-      
-      chartInstance = new ApexCharts(document.querySelector("#chart-canvas"), options);
+      if (chartInstance) { chartInstance.destroy(); }
+      chartInstance = new ApexCharts(document.querySelector('#chart-canvas'), opts);
       chartInstance.render();
     }
   </script>
