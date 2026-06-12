@@ -36,7 +36,7 @@ def _mtimes(paths: list[str]) -> dict[str, float]:
 
 def _generate() -> None:
     print("[serve] 리포트 생성 중...")
-    env = {**os.environ, "CI": ""}  # CI 환경변수 제거해 webbrowser.open 방지
+    env = {**os.environ, "CI": "1"}  # run.py의 webbrowser.open 억제 (serve.py가 http:// 서빙)
     res = subprocess.run(
         [sys.executable, "run.py"],
         capture_output=True, text=True, env=env,
