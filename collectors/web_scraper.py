@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-from datetime import date
 from urllib.parse import urljoin
 
 import requests
@@ -108,9 +107,10 @@ class WebScraperCollector:
         if filter_text and filter_text not in title:
             return None
 
-        raw_date = date_element.get_text(" ", strip=True) if date_element else str(date.today())
-        normalized_date = normalize_date(raw_date)
-        return title, urljoin(self.config["url"], href), normalized_date
+        full_url = urljoin(self.config["url"], href)
+        raw_date = date_element.get_text(" ", strip=True) if date_element else ""
+        normalized_date = normalize_date(raw_date, url=full_url)
+        return title, full_url, normalized_date
 
     def _extract_lede_from_element(self, element, selectors: dict) -> str:
         lede_selector = selectors.get("lede")
@@ -150,7 +150,8 @@ class WebScraperCollector:
         for record in records[: self.config.get("max_items", 10)]:
             title = str(record.get(fields["title"], "")).strip()
             url = str(record.get(fields["link"], "")).strip()
-            item_date = normalize_date(str(record.get(fields["date"], "")))
+            item_url = urljoin(self.config["url"], url)
+            item_date = normalize_date(str(record.get(fields["date"], "")), url=item_url)
             if not title or not url:
                 continue
 
