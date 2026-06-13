@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
@@ -8,11 +8,13 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 from collectors.base import CollectorResult, Report
 
 SECTION_ORDER = ["속보", "한국경제", "매일경제", "사설", "미국 뉴스", "연준 보고서", "KB금융 리서치", "하나증권 모닝브리프"]
+KST = timezone(timedelta(hours=9))
 
 
 def _result_to_section(result: CollectorResult) -> dict:
+    sorted_items = sorted(result.items, key=lambda item: item.date or "", reverse=True)
     items = []
-    for item in result.items:
+    for item in sorted_items:
         is_pdf = isinstance(item, Report)
         items.append(
             {
@@ -50,9 +52,10 @@ def render_report(results: list[CollectorResult], output_path: Path) -> None:
         autoescape=select_autoescape(enabled_extensions=("html", "j2")),
     )
     template = environment.get_template("daily.html.j2")
+    now_kst = datetime.now(KST)
     html = template.render(
-        date=date.today().strftime("%Y년 %m월 %d일"),
-        generated_at=date.today().isoformat(),
+        date=now_kst.strftime("%Y년 %m월 %d일"),
+        generated_at=now_kst.date().isoformat(),
         indices=market_result.indices if market_result else [],
         market_error=market_result.error if market_result else None,
         history_data=market_result.history_data if market_result else {},

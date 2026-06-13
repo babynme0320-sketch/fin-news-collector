@@ -206,7 +206,7 @@ def main() -> Path:
 
     results.append(EconIndicatorCollector().collect())
 
-    today = date.today().strftime("%Y%m%d")
+    today = datetime.now(KST).strftime("%Y%m%d")
     output_path = Path("reports") / f"report_{today}.html"
     render_report(results, output_path)
     if not os.getenv("CI"):
