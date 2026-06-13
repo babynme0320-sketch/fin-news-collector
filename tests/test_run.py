@@ -66,7 +66,7 @@ housekeeping:
     output = run.main()
 
     assert output == rendered["path"]
-    assert rendered["count"] == 3
+    assert rendered["count"] == 4
     assert opened["uri"].startswith("file://")
     assert ("web-collect", "한국경제") in calls
     assert ("hana-collect", True) in calls

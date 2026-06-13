@@ -3,7 +3,11 @@ from __future__ import annotations
 from collectors.hana_brief import HanaBriefCollector
 
 
-def test_hana_brief_requires_real_channel_id():
+def test_hana_brief_requires_real_channel_id(monkeypatch):
+    monkeypatch.setattr(
+        "collectors.hana_brief.HanaBriefCollector._collect_via_direct_urls",
+        lambda self: [],
+    )
     result = HanaBriefCollector({"channel_id": "REPLACE_WITH_CHANNEL_ID"}).collect()
     assert "channel_id" in result.error
 

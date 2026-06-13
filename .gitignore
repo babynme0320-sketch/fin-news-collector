@@ -8,3 +8,7 @@ venv/
 .env
 *.egg-info/
 .omc/
+
+# macOS metadata files (external drive artifacts)
+._*
+.DS_Store

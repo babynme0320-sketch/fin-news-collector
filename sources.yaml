@@ -4,46 +4,46 @@
 web_sources:
   - name: "한국경제"
     enabled: true
-    url: "https://www.hankyung.com/mr"
+    url: "https://www.hankyung.com/feed/all-news"
     type: "articles"
-    parser: "html.parser"
+    parser: "lxml-xml"
     selectors:
-      list_container: "div.aside-news-module div.news-list"
-      item: "div.news-item"
-      title: "h3.news-tit a"
-      link: "h3.news-tit a"
-      date: "span.date"
-      lede_url: true
+      list_container: ""
+      item: "item"
+      title: "title"
+      link: "link"
+      date: "pubDate"
+      lede: "description"
     max_items: 10
     encoding: "utf-8"
 
   - name: "한국경제 금융·마켓"
     enabled: true
-    url: "https://www.hankyung.com/financial-market"
+    url: "https://www.hankyung.com/feed/finance"
     type: "articles"
-    parser: "html.parser"
+    parser: "lxml-xml"
     selectors:
       list_container: ""
-      item: "div.news-item"
-      title: "h2.news-tit a"
-      link: "h2.news-tit a"
-      date: "p.txt-date"
-      lede: "p.lead"
+      item: "item"
+      title: "title"
+      link: "link"
+      date: "pubDate"
+      lede: "description"
     max_items: 8
     encoding: "utf-8"
 
   - name: "한국경제 경제"
     enabled: true
-    url: "https://www.hankyung.com/economy"
+    url: "https://www.hankyung.com/feed/economy"
     type: "articles"
-    parser: "html.parser"
+    parser: "lxml-xml"
     selectors:
       list_container: ""
-      item: "div.news-item"
-      title: "h2.news-tit a"
-      link: "h2.news-tit a"
-      date: "p.txt-date"
-      lede: "p.lead"
+      item: "item"
+      title: "title"
+      link: "link"
+      date: "pubDate"
+      lede: "description"
     max_items: 8
     encoding: "utf-8"
 
@@ -94,15 +94,16 @@ web_sources:
 
   - name: "한국경제 사설"
     enabled: true
-    url: "https://www.hankyung.com/opinion"
+    url: "https://www.hankyung.com/feed/opinion"
     type: "articles"
-    parser: "html.parser"
+    parser: "lxml-xml"
     selectors:
-      list_container: "div.opinion-list div.major-news"
-      item: "div.news-item"
-      title: "h2 a"
-      link: "h2 a"
-      date: "span.date"
+      list_container: ""
+      item: "item"
+      title: "title"
+      link: "link"
+      date: "pubDate"
+      lede: "description"
     max_items: 9
     encoding: "utf-8"
 
