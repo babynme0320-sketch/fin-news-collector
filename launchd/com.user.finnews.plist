@@ -7,9 +7,8 @@
   <string>com.user.finnews</string>
   <key>ProgramArguments</key>
   <array>
-    <!-- 반드시 가상환경 python 사용. /usr/bin/python3 금지 (venv 패키지 없음) -->
-    <string>/Volumes/SK_2TB/CODING/PROGRAM/그냥작업/harness practice/fin-news-collector/venv/bin/python3</string>
-    <string>/Volumes/SK_2TB/CODING/PROGRAM/그냥작업/harness practice/fin-news-collector/run.py</string>
+    <string>/Users/och/.venvs/fin-news-collector/bin/python3</string>
+    <string>/Users/och/코딩/harness practice/fin-news-collector/run.py</string>
   </array>
   <key>StartCalendarInterval</key>
   <dict>
@@ -17,7 +16,7 @@
     <key>Minute</key><integer>0</integer>
   </dict>
   <key>WorkingDirectory</key>
-  <string>/Volumes/SK_2TB/CODING/PROGRAM/그냥작업/harness practice/fin-news-collector</string>
+  <string>/Users/och/코딩/harness practice/fin-news-collector</string>
   <key>StandardOutPath</key>
   <string>/tmp/finnews.log</string>
   <key>StandardErrorPath</key>
