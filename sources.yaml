@@ -3,7 +3,7 @@
 
 web_sources:
   - name: "한국경제"
-    enabled: true
+    enabled: false
     url: "https://www.hankyung.com/feed/all-news"
     type: "articles"
     parser: "lxml-xml"
@@ -29,8 +29,18 @@ web_sources:
       link: "link"
       date: "pubDate"
       lede: "description"
+      category: "category"
     max_items: 8
     encoding: "utf-8"
+    inspect_article_section: true
+    allowed_article_sections_any:
+      - "금융"
+      - "증권"
+      - "마켓"
+      - "시장"
+      - "기업"
+      - "부동산"
+      - "경제"
 
   - name: "한국경제 경제"
     enabled: true
@@ -44,8 +54,18 @@ web_sources:
       link: "link"
       date: "pubDate"
       lede: "description"
+      category: "category"
     max_items: 8
     encoding: "utf-8"
+    inspect_article_section: true
+    allowed_article_sections_any:
+      - "경제"
+      - "금융"
+      - "증권"
+      - "마켓"
+      - "시장"
+      - "기업"
+      - "부동산"
 
   - name: "CNBC 경제"
     enabled: true

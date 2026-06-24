@@ -23,6 +23,7 @@ class WebScraperCollector:
 
     def __init__(self, config: dict):
         self.config = config
+        self._article_meta_cache: dict[str, dict[str, str]] = {}
 
     def collect(self) -> CollectorResult:
         result = CollectorResult(source_name=self.config["name"], kind="section")
@@ -108,6 +109,10 @@ class WebScraperCollector:
             return None
 
         full_url = urljoin(self.config["url"], href)
+        categories = self._extract_categories_from_element(element, selectors)
+        if not self._passes_filters(title=title, url=full_url, categories=categories):
+            return None
+
         raw_date = date_element.get_text(" ", strip=True) if date_element else ""
         normalized_date = normalize_date(raw_date, url=full_url)
         return title, full_url, normalized_date
@@ -154,6 +159,9 @@ class WebScraperCollector:
             item_date = normalize_date(str(record.get(fields["date"], "")), url=item_url)
             if not title or not url:
                 continue
+            categories = self._extract_categories_from_record(record, fields)
+            if not self._passes_filters(title=title, url=item_url, categories=categories):
+                continue
 
             if self.config["type"] == "articles":
                 lede = ""
@@ -188,28 +196,159 @@ class WebScraperCollector:
 
         return result
 
-    def _fetch_lede(self, url: str) -> str:
+    def _passes_filters(self, *, title: str, url: str, categories: tuple[str, ...] = ()) -> bool:
+        allow_title = self._normalize_filter_values(self.config.get("allow_title_contains_any"))
+        deny_title = self._normalize_filter_values(self.config.get("deny_title_contains_any"))
+        allow_url = self._normalize_filter_values(self.config.get("allow_url_contains_any"))
+        deny_url = self._normalize_filter_values(self.config.get("deny_url_contains_any"))
+        allow_categories = self._normalize_filter_values(self.config.get("allowed_categories_any"))
+        deny_categories = self._normalize_filter_values(self.config.get("denied_categories_any"))
+        allow_sections = self._normalize_filter_values(self.config.get("allowed_article_sections_any"))
+        deny_sections = self._normalize_filter_values(self.config.get("denied_article_sections_any"))
+
+        if allow_title and not any(term in title for term in allow_title):
+            return False
+        if deny_title and any(term in title for term in deny_title):
+            return False
+        if allow_url and not any(term in url for term in allow_url):
+            return False
+        if deny_url and any(term in url for term in deny_url):
+            return False
+        if allow_categories and not self._matches_any(categories, allow_categories):
+            return False
+        if deny_categories and self._matches_any(categories, deny_categories):
+            return False
+        if allow_sections or deny_sections:
+            article_section = self._resolve_article_section(url)
+            if allow_sections and not self._matches_any((article_section,), allow_sections):
+                return False
+            if deny_sections and self._matches_any((article_section,), deny_sections):
+                return False
+        return True
+
+    def _normalize_filter_values(self, raw: object) -> tuple[str, ...]:
+        if raw is None:
+            return ()
+        if isinstance(raw, str):
+            return (raw,)
+        if isinstance(raw, list):
+            return tuple(str(value) for value in raw if str(value))
+        return ()
+
+    def _extract_categories_from_element(self, element, selectors: dict) -> tuple[str, ...]:
+        selector = selectors.get("category")
+        return self._extract_text_values(element, selector)
+
+    def _extract_categories_from_record(self, record: dict, fields: dict) -> tuple[str, ...]:
+        field_name = fields.get("category")
+        if not field_name:
+            return ()
+        raw = record.get(field_name, ())
+        if isinstance(raw, list):
+            return tuple(str(value).strip() for value in raw if str(value).strip())
+        if raw is None:
+            return ()
+        text = str(raw).strip()
+        return (text,) if text else ()
+
+    def _extract_text_values(self, element, selector: str | None) -> tuple[str, ...]:
+        if not selector:
+            return ()
+        values = []
+        for node in element.select(selector):
+            text = node.get_text(" ", strip=True)
+            if text:
+                values.append(text)
+        return tuple(values)
+
+    def _matches_any(self, values: tuple[str, ...], patterns: tuple[str, ...]) -> bool:
+        if not values:
+            return False
+        for value in values:
+            for pattern in patterns:
+                if pattern and pattern in value:
+                    return True
+        return False
+
+    def _resolve_article_section(self, url: str) -> str:
+        metadata = self._fetch_article_metadata(url)
+        for key in ("article_section", "section", "breadcrumb"):
+            value = metadata.get(key, "").strip()
+            if value:
+                return value
+        return ""
+
+    def _fetch_article_metadata(self, url: str) -> dict[str, str]:
+        cached = self._article_meta_cache.get(url)
+        if cached is not None:
+            return cached
+
         try:
             response = requests.get(url, headers=HEADERS, timeout=TIMEOUT)
             response.raise_for_status()
         except requests.RequestException:
-            return ""
+            self._article_meta_cache[url] = {}
+            return {}
 
         if self.config.get("encoding"):
             response.encoding = self.config["encoding"]
 
         soup = BeautifulSoup(response.text, "html.parser")
-        for selector in ("meta[property='og:description']", "meta[name='description']"):
-            meta = soup.select_one(selector)
-            description = (meta.get("content", "") if meta else "").strip()
-            if description:
-                return description[:200]
+        metadata = {
+            "description": self._read_meta_content(
+                soup,
+                ("meta[property='og:description']", "meta[name='description']"),
+            ),
+            "article_section": self._read_meta_content(
+                soup,
+                (
+                    "meta[property='article:section']",
+                    "meta[name='article:section']",
+                    "meta[name='section']",
+                ),
+            ),
+            "breadcrumb": self._read_breadcrumb_text(soup),
+            "first_paragraph": self._read_first_paragraph_text(soup),
+        }
 
+        metadata["section"] = metadata["article_section"] or metadata["breadcrumb"]
+        self._article_meta_cache[url] = metadata
+        return metadata
+
+    def _read_meta_content(self, soup: BeautifulSoup, selectors: tuple[str, ...]) -> str:
+        for selector in selectors:
+            meta = soup.select_one(selector)
+            content = (meta.get("content", "") if meta else "").strip()
+            if content:
+                return content
+        return ""
+
+    def _read_breadcrumb_text(self, soup: BeautifulSoup) -> str:
+        for selector in (
+            "nav[aria-label='breadcrumb'] a",
+            ".breadcrumb a",
+            ".location a",
+            ".article-breadcrumb a",
+        ):
+            nodes = soup.select(selector)
+            if nodes:
+                text = nodes[-1].get_text(" ", strip=True)
+                if text:
+                    return text
+        return ""
+
+    def _read_first_paragraph_text(self, soup: BeautifulSoup) -> str:
         for paragraph in soup.find_all("p"):
             text = paragraph.get_text(" ", strip=True)
             if len(text) > 30 and "Google 검색에서 한국경제 기사를 더 자주 볼 수 있습니다." not in text:
                 return text[:200]
         return ""
+
+    def _fetch_lede(self, url: str) -> str:
+        metadata = self._fetch_article_metadata(url)
+        if metadata.get("description"):
+            return metadata["description"][:200]
+        return metadata.get("first_paragraph", "")
 
     def _download(self, url: str) -> str:
         try:

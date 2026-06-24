@@ -169,3 +169,138 @@ def test_collects_json_pdf_items(monkeypatch):
     assert len(result.items) == 1
     assert result.items[0].title == "KB 데일리"
     assert result.items[0].local_path.endswith("report.pdf")
+
+
+def test_filters_items_by_configured_title_and_url_rules(monkeypatch):
+    listing_html = """
+    <ul class="news_list">
+      <li>
+        <a class="tit" href="/finance/1">증시 급등</a>
+        <span class="time">2026.06.12</span>
+        <span class="category">증권</span>
+      </li>
+      <li>
+        <a class="tit" href="/politics/2">국방장관 탄핵</a>
+        <span class="time">2026.06.12</span>
+        <span class="category">정치</span>
+      </li>
+    </ul>
+    """
+    article_html = """
+    <html>
+      <head><meta property="article:section" content="증권"></head>
+      <body><p>충분히 긴 기사 요약입니다. 금융 시장 설명이 이어집니다.</p></body>
+    </html>
+    """
+    monkeypatch.setattr(
+        "collectors.web_scraper.requests.request",
+        lambda method, url, headers, timeout, data=None: DummyResponse(listing_html),
+    )
+    monkeypatch.setattr(
+        "collectors.web_scraper.requests.get",
+        lambda url, headers, timeout: DummyResponse(article_html),
+    )
+
+    collector = WebScraperCollector(
+        {
+            "name": "한국경제 금융·마켓",
+            "url": "https://example.com/news",
+            "type": "articles",
+            "selectors": {
+                "list_container": "ul.news_list",
+                "item": "li",
+                "title": "a.tit",
+                "link": "a.tit",
+                "date": "span.time",
+                "category": ".category",
+            },
+            "allowed_categories_any": ["증권", "금융", "경제"],
+            "allowed_article_sections_any": ["증권", "금융", "경제"],
+        }
+    )
+
+    result = collector.collect()
+
+    assert result.error is None
+    assert [item.title for item in result.items] == ["증시 급등"]
+
+
+def test_filters_json_items_by_configured_rules(monkeypatch):
+    payload = """
+    {"list":[
+      {"title":"환율 급등","link":"/economy/1","pubDate":"2026-06-12","category":"경제"},
+      {"title":"여름엔 망고 디저트 경쟁","link":"/life/2","pubDate":"2026-06-12","category":"생활"}
+    ]}
+    """
+
+    monkeypatch.setattr(
+        "collectors.web_scraper.requests.request",
+        lambda method, url, headers, timeout, data=None: DummyResponse(payload),
+    )
+
+    collector = WebScraperCollector(
+        {
+            "name": "한국경제 경제",
+            "url": "https://example.com/api",
+            "type": "articles",
+            "response_format": "json",
+            "items_key": "list",
+            "fields": {
+                "title": "title",
+                "link": "link",
+                "date": "pubDate",
+                "category": "category",
+            },
+            "allowed_categories_any": ["경제", "금융", "증권"],
+        }
+    )
+
+    result = collector.collect()
+
+    assert result.error is None
+    assert [item.title for item in result.items] == ["환율 급등"]
+
+
+def test_filters_by_article_section_when_feed_category_is_missing(monkeypatch):
+    listing_html = """
+    <ul class="news_list">
+      <li><a class="tit" href="/article/1">시장 뉴스</a><span class="time">2026.06.12</span></li>
+      <li><a class="tit" href="/article/2">사회 뉴스</a><span class="time">2026.06.12</span></li>
+    </ul>
+    """
+
+    def fake_get(url, headers, timeout):
+        if url.endswith("/1"):
+            return DummyResponse(
+                '<html><head><meta property="article:section" content="경제"></head><body></body></html>'
+            )
+        return DummyResponse(
+            '<html><head><meta property="article:section" content="사회"></head><body></body></html>'
+        )
+
+    monkeypatch.setattr(
+        "collectors.web_scraper.requests.request",
+        lambda method, url, headers, timeout, data=None: DummyResponse(listing_html),
+    )
+    monkeypatch.setattr("collectors.web_scraper.requests.get", fake_get)
+
+    collector = WebScraperCollector(
+        {
+            "name": "한국경제 경제",
+            "url": "https://example.com/news",
+            "type": "articles",
+            "selectors": {
+                "list_container": "ul.news_list",
+                "item": "li",
+                "title": "a.tit",
+                "link": "a.tit",
+                "date": "span.time",
+            },
+            "allowed_article_sections_any": ["경제", "금융", "증권"],
+        }
+    )
+
+    result = collector.collect()
+
+    assert result.error is None
+    assert [item.title for item in result.items] == ["시장 뉴스"]

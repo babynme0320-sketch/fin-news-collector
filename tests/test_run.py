@@ -4,7 +4,7 @@ from datetime import date, timedelta
 from pathlib import Path
 
 import run
-from collectors.base import CollectorResult
+from collectors.base import Article, CollectorResult
 
 
 def test_main_wires_collectors_and_opens_report(monkeypatch, tmp_path: Path):
@@ -94,3 +94,41 @@ def test_cleanup_old_outputs_removes_entries_older_than_retention(tmp_path: Path
     assert not (reports_dir / f"report_{old_date}.html").exists()
     assert (data_dir / keep_date).exists()
     assert not (data_dir / old_date).exists()
+
+
+def test_apply_merge_groups_excludes_broad_hankyung_source():
+    broad = CollectorResult(
+        source_name="한국경제",
+        items=[
+            Article(
+                title="국방장관 탄핵",
+                url="https://example.com/politics/1",
+                date="2026-06-12",
+            )
+        ],
+    )
+    finance = CollectorResult(
+        source_name="한국경제 금융·마켓",
+        items=[
+            Article(
+                title="코스피 급등",
+                url="https://example.com/finance/1",
+                date="2026-06-12",
+            )
+        ],
+    )
+    economy = CollectorResult(
+        source_name="한국경제 경제",
+        items=[
+            Article(
+                title="환율 하락",
+                url="https://example.com/economy/1",
+                date="2026-06-12",
+            )
+        ],
+    )
+
+    merged = run._apply_merge_groups([broad, finance, economy])
+    hankyung = next(result for result in merged if result.source_name == "한국경제")
+
+    assert [item.title for item in hankyung.items] == ["코스피 급등", "환율 하락"]
