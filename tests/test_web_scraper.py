@@ -32,8 +32,8 @@ def test_collects_article_items(monkeypatch):
             return DummyResponse(article_html)
         return DummyResponse(listing_html)
 
-    monkeypatch.setattr("collectors.web_scraper.requests.request", lambda method, url, headers, timeout, data=None: DummyResponse(listing_html))
-    monkeypatch.setattr("collectors.web_scraper.requests.get", fake_get)
+    monkeypatch.setattr("collectors.web_scraper._SESSION.request", lambda method, url, headers, timeout, data=None: DummyResponse(listing_html))
+    monkeypatch.setattr("collectors.web_scraper._SESSION.get", fake_get)
 
     collector = WebScraperCollector(
         {
@@ -75,7 +75,7 @@ def test_collects_pdf_items_without_failing_on_download_error(monkeypatch):
     """
 
     monkeypatch.setattr(
-        "collectors.web_scraper.requests.request",
+        "collectors.web_scraper._SESSION.request",
         lambda method, url, headers, timeout, data=None: DummyResponse(listing_html),
     )
     monkeypatch.setattr(
@@ -109,7 +109,7 @@ def test_collects_pdf_items_without_failing_on_download_error(monkeypatch):
 
 def test_returns_error_when_selector_matches_nothing(monkeypatch):
     monkeypatch.setattr(
-        "collectors.web_scraper.requests.request",
+        "collectors.web_scraper._SESSION.request",
         lambda method, url, headers, timeout, data=None: DummyResponse("<html><body>empty</body></html>"),
     )
 
@@ -138,7 +138,7 @@ def test_collects_json_pdf_items(monkeypatch):
     """
 
     monkeypatch.setattr(
-        "collectors.web_scraper.requests.request",
+        "collectors.web_scraper._SESSION.request",
         lambda method, url, headers, timeout, data=None: DummyResponse(payload),
     )
     monkeypatch.setattr(
@@ -193,11 +193,11 @@ def test_filters_items_by_configured_title_and_url_rules(monkeypatch):
     </html>
     """
     monkeypatch.setattr(
-        "collectors.web_scraper.requests.request",
+        "collectors.web_scraper._SESSION.request",
         lambda method, url, headers, timeout, data=None: DummyResponse(listing_html),
     )
     monkeypatch.setattr(
-        "collectors.web_scraper.requests.get",
+        "collectors.web_scraper._SESSION.get",
         lambda url, headers, timeout: DummyResponse(article_html),
     )
 
@@ -234,7 +234,7 @@ def test_filters_json_items_by_configured_rules(monkeypatch):
     """
 
     monkeypatch.setattr(
-        "collectors.web_scraper.requests.request",
+        "collectors.web_scraper._SESSION.request",
         lambda method, url, headers, timeout, data=None: DummyResponse(payload),
     )
 
@@ -279,10 +279,10 @@ def test_filters_by_article_section_when_feed_category_is_missing(monkeypatch):
         )
 
     monkeypatch.setattr(
-        "collectors.web_scraper.requests.request",
+        "collectors.web_scraper._SESSION.request",
         lambda method, url, headers, timeout, data=None: DummyResponse(listing_html),
     )
-    monkeypatch.setattr("collectors.web_scraper.requests.get", fake_get)
+    monkeypatch.setattr("collectors.web_scraper._SESSION.get", fake_get)
 
     collector = WebScraperCollector(
         {
@@ -304,3 +304,98 @@ def test_filters_by_article_section_when_feed_category_is_missing(monkeypatch):
 
     assert result.error is None
     assert [item.title for item in result.items] == ["시장 뉴스"]
+
+
+class DummyHead:
+    def __init__(self, headers: dict, status_code: int = 200):
+        self.headers = headers
+        self.status_code = status_code
+
+    def raise_for_status(self) -> None:
+        if self.status_code >= 400:
+            raise requests.HTTPError(f"http {self.status_code}")
+
+
+_DIRECT_PDF_CONFIG = {
+    "name": "JP모간 마켓 가이드",
+    "url": "https://example.com/guide-to-the-markets.pdf",
+    "type": "direct_pdf",
+    "title": "J.P. Morgan Guide to the Markets (US)",
+}
+
+
+def test_direct_pdf_uses_last_modified_as_date(monkeypatch):
+    monkeypatch.setattr(
+        "collectors.web_scraper.requests.head",
+        lambda url, headers, timeout, allow_redirects: DummyHead(
+            {"Content-Type": "application/pdf", "Last-Modified": "Thu, 02 Jul 2026 10:34:33 GMT"}
+        ),
+    )
+    monkeypatch.setattr(
+        "collectors.web_scraper.download_pdf",
+        lambda url, source: "data/20260717/JP모간/guide.pdf",
+    )
+
+    result = WebScraperCollector(_DIRECT_PDF_CONFIG).collect()
+
+    assert result.error is None
+    assert len(result.items) == 1
+    item = result.items[0]
+    assert item.date == "2026-07-02"
+    assert item.title == "J.P. Morgan Guide to the Markets (US)"
+    assert item.pdf_url == "https://example.com/guide-to-the-markets.pdf"
+    assert item.local_path == "data/20260717/JP모간/guide.pdf"
+
+
+def test_direct_pdf_rejects_non_pdf_response(monkeypatch):
+    """PDF URL이 로그인/에러 페이지로 리다이렉트되면 HTML을 PDF로 저장하지 않는다."""
+    monkeypatch.setattr(
+        "collectors.web_scraper.requests.head",
+        lambda url, headers, timeout, allow_redirects: DummyHead({"Content-Type": "text/html"}),
+    )
+
+    def unexpected_download(url, source):
+        raise AssertionError("PDF가 아니면 다운로드하지 않아야 함")
+
+    monkeypatch.setattr("collectors.web_scraper.download_pdf", unexpected_download)
+
+    result = WebScraperCollector(_DIRECT_PDF_CONFIG).collect()
+
+    assert result.items == []
+    assert "PDF가 아님" in result.error
+
+
+def test_direct_pdf_reports_network_error(monkeypatch):
+    def fake_head(url, headers, timeout, allow_redirects):
+        raise requests.ConnectionError("boom")
+
+    monkeypatch.setattr("collectors.web_scraper.requests.head", fake_head)
+
+    result = WebScraperCollector(_DIRECT_PDF_CONFIG).collect()
+
+    assert result.items == []
+    assert "boom" in result.error
+
+
+def test_source_user_agent_overrides_default(monkeypatch):
+    """한경 WAF 우회용 per-source UA가 실제 요청 헤더에 반영되는지 확인."""
+    seen: dict[str, str] = {}
+
+    def fake_request(method, url, headers, timeout, data=None):
+        seen.update(headers)
+        return DummyResponse("<rss><item><title>x</title><link>https://e.com/1</link></item></rss>")
+
+    monkeypatch.setattr("collectors.web_scraper._SESSION.request", fake_request)
+
+    WebScraperCollector(
+        {
+            "name": "한국경제 경제",
+            "url": "https://www.hankyung.com/feed/economy",
+            "type": "articles",
+            "parser": "lxml-xml",
+            "user_agent": "curl/8.7.1",
+            "selectors": {"list_container": "", "item": "item", "title": "title", "link": "link"},
+        }
+    ).collect()
+
+    assert seen["User-Agent"] == "curl/8.7.1"

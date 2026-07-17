@@ -1,9 +1,13 @@
 from __future__ import annotations
 
 import json
-from urllib.parse import urljoin
+import threading
+import time
+from urllib.parse import urljoin, urlsplit
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 from bs4 import BeautifulSoup
 
 from .base import Article, CollectorResult, Report, normalize_date
@@ -17,6 +21,49 @@ HEADERS = {
 }
 TIMEOUT = (5, 15)
 
+# Cloudflare가 보호하는 소스(한경)는 GitHub Actions 데이터센터 IP에서 요청이 몰리면
+# 짧은 윈도우의 레이트리밋으로 403을 반환한다. 단발 요청은 통과하므로, 재시도+백오프로
+# 회복하고, 호스트별 최소 간격(스로틀)으로 버스트를 완화한다.
+_RETRY_STATUSES = (403, 429, 500, 502, 503, 504)
+_THROTTLE_HOSTS = {"www.hankyung.com", "hankyung.com"}
+_THROTTLE_INTERVAL = 0.4  # 동일 호스트 연속 요청 사이 최소 간격(초)
+_throttle_lock = threading.Lock()
+_last_request_at: dict[str, float] = {}
+
+
+def _build_session() -> requests.Session:
+    session = requests.Session()
+    retry = Retry(
+        total=3,
+        connect=3,
+        read=3,
+        status=3,
+        backoff_factor=1.5,  # 재시도 간격 0 → 1.5s → 3s
+        status_forcelist=_RETRY_STATUSES,
+        allowed_methods=frozenset(["GET", "POST"]),
+        respect_retry_after_header=True,
+        raise_on_status=False,  # 재시도 소진 시 마지막 응답을 그대로 반환(기존 에러 처리 유지)
+    )
+    adapter = HTTPAdapter(max_retries=retry)
+    session.mount("https://", adapter)
+    session.mount("http://", adapter)
+    return session
+
+
+_SESSION = _build_session()
+
+
+def _throttle(url: str) -> None:
+    host = urlsplit(url).hostname or ""
+    if host not in _THROTTLE_HOSTS:
+        return
+    with _throttle_lock:
+        now = time.monotonic()
+        wait = _THROTTLE_INTERVAL - (now - _last_request_at.get(host, 0.0))
+        if wait > 0:
+            time.sleep(wait)
+        _last_request_at[host] = time.monotonic()
+
 
 class WebScraperCollector:
     """Collect articles or PDF links from a YAML-defined source config."""
@@ -27,6 +74,9 @@ class WebScraperCollector:
 
     def collect(self) -> CollectorResult:
         result = CollectorResult(source_name=self.config["name"], kind="section")
+
+        if self.config.get("type") == "direct_pdf":
+            return self._collect_direct_pdf(result)
 
         try:
             response = self._request()
@@ -127,13 +177,20 @@ class WebScraperCollector:
             return ""
         return lede_element.get_text(" ", strip=True)[:200]
 
+    def _headers(self) -> dict:
+        user_agent = self.config.get("user_agent")
+        if not user_agent:
+            return HEADERS
+        return {**HEADERS, "User-Agent": user_agent}
+
     def _request(self) -> requests.Response:
         method = self.config.get("request_method", "GET").upper()
         request_data = self.config.get("request_data")
-        return requests.request(
+        _throttle(self.config["url"])
+        return _SESSION.request(
             method,
             self.config["url"],
-            headers=HEADERS,
+            headers=self._headers(),
             timeout=TIMEOUT,
             data=request_data,
         )
@@ -220,6 +277,9 @@ class WebScraperCollector:
             return False
         if allow_sections or deny_sections:
             article_section = self._resolve_article_section(url)
+            if article_section is None:
+                # 섹션을 확인할 수 없으면(사이트 차단 등) 기사를 버리지 않고 통과시킨다.
+                return True
             if allow_sections and not self._matches_any((article_section,), allow_sections):
                 return False
             if deny_sections and self._matches_any((article_section,), deny_sections):
@@ -270,8 +330,11 @@ class WebScraperCollector:
                     return True
         return False
 
-    def _resolve_article_section(self, url: str) -> str:
+    def _resolve_article_section(self, url: str) -> str | None:
         metadata = self._fetch_article_metadata(url)
+        if metadata.get("_error"):
+            # 원문 페이지 fetch 실패(레이트리밋 등) → 섹션 미상. 필터를 fail-open 처리.
+            return None
         for key in ("article_section", "section", "breadcrumb"):
             value = metadata.get(key, "").strip()
             if value:
@@ -284,11 +347,12 @@ class WebScraperCollector:
             return cached
 
         try:
-            response = requests.get(url, headers=HEADERS, timeout=TIMEOUT)
+            _throttle(url)
+            response = _SESSION.get(url, headers=self._headers(), timeout=TIMEOUT)
             response.raise_for_status()
         except requests.RequestException:
-            self._article_meta_cache[url] = {}
-            return {}
+            self._article_meta_cache[url] = {"_error": True}
+            return {"_error": True}
 
         if self.config.get("encoding"):
             response.encoding = self.config["encoding"]
@@ -355,3 +419,42 @@ class WebScraperCollector:
             return download_pdf(url, self.config["name"])
         except (requests.RequestException, OSError):
             return ""
+
+    def _collect_direct_pdf(self, result: CollectorResult) -> CollectorResult:
+        """URL이 고정된 단일 PDF(정기 간행물). 목록 페이지가 없어 Last-Modified를 발행일로 사용."""
+        url = self.config["url"]
+        try:
+            response = requests.head(
+                url, headers=self._headers(), timeout=TIMEOUT, allow_redirects=True
+            )
+            response.raise_for_status()
+        except requests.Timeout:
+            result.error = "timeout (connect 5s / read 15s 초과)"
+            return result
+        except requests.RequestException as exc:
+            result.error = str(exc)
+            return result
+
+        content_type = response.headers.get("Content-Type", "")
+        if "pdf" not in content_type.lower():
+            result.error = f"PDF가 아님 (Content-Type: {content_type or '없음'})"
+            return result
+
+        # Last-Modified는 RFC 2822 형식 → normalize_date가 그대로 처리
+        item_date = normalize_date(response.headers.get("Last-Modified", ""), url=url)
+
+        local_path = self._download(url)
+        if not local_path:
+            result.error = "PDF 다운로드 실패"
+            return result
+
+        result.items.append(
+            Report(
+                title=self.config.get("title") or self.config["name"],
+                pdf_url=url,
+                date=item_date,
+                local_path=local_path,
+                source=self.config["name"],
+            )
+        )
+        return result
