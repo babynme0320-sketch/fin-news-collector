@@ -6,14 +6,18 @@ on:
       - probe/hankyung
 
 jobs:
-  validate:
+  probe:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        n: [1, 2, 3, 4, 5, 6]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
       - name: 의존성 설치
-        run: pip install -r requirements.txt
-      - name: 수정본 한경 수집 검증 (실제 WebScraperCollector)
-        run: python validate_hankyung.py
+        run: pip install requests curl_cffi
+      - name: 한경 접근 비교 (job ${{ matrix.n }})
+        run: python probe_hankyung.py
