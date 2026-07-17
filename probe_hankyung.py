@@ -1,13 +1,15 @@
-"""차단 IP에서 어떤 접근법이 한경 Cloudflare를 통과하는지 비교(일회용 진단)."""
+"""연속 요청량에 따른 한경 403 발생 지점을 측정(레이트리밋 가설 검증, 일회용)."""
+import re
+import time
+
 import requests
 
-URL = "https://www.hankyung.com/feed/finance"
-GOOGLE_NEWS = ("https://news.google.com/rss/search?"
-               "q=site:hankyung.com%20when:1d&hl=ko&gl=KR&ceid=KR:ko")
+FEED = "https://www.hankyung.com/feed/finance"
+UA = {"User-Agent": "curl/8.7.1"}
 
 
-def line(label, code, n, extra=""):
-    print(f"{label:38} -> {code}  len={n}  {extra}", flush=True)
+def strip(s):
+    return re.sub(r"<!\[CDATA\[(.*?)\]\]>", r"\1", s, flags=re.S).strip()
 
 
 try:
@@ -16,29 +18,39 @@ except Exception as e:
     ip = f"?({e})"
 print(f"\n===== egress IP: {ip} =====", flush=True)
 
-# 1) plain requests + curl UA (현재 설정)
-try:
-    r = requests.get(URL, headers={"User-Agent": "curl/8.7.1"}, timeout=15)
-    line("requests curl/8.7.1 (current)", r.status_code, len(r.content))
-except Exception as e:
-    line("requests curl/8.7.1 (current)", "ERR", 0, str(e))
+# 피드에서 기사 링크 수집
+xml = requests.get(FEED, headers=UA, timeout=15).text
+links = [strip(m) for m in re.findall(r"<link>(.*?)</link>", xml, re.S)]
+links = [l for l in links if "/article/" in l][:30]
+print(f"feed items to hit: {len(links)}", flush=True)
 
-# 2) curl_cffi 브라우저 TLS 지문 여러 종
-try:
-    from curl_cffi import requests as cffi
-    for imp in ["chrome", "chrome131", "chrome124", "safari", "safari17_0"]:
+
+def run(label, delay, use_cffi=False, impersonate=None):
+    print(f"\n--- {label} (delay={delay}s) ---", flush=True)
+    if use_cffi:
+        from curl_cffi import requests as client
+        get = lambda u: client.get(u, impersonate=impersonate, timeout=15)
+    else:
+        get = lambda u: requests.get(u, headers=UA, timeout=15)
+    first_403 = None
+    codes = []
+    for i, url in enumerate(links, 1):
         try:
-            r = cffi.get(URL, impersonate=imp, timeout=15)
-            line(f"curl_cffi {imp}", r.status_code, len(r.content))
+            c = get(url).status_code
         except Exception as e:
-            line(f"curl_cffi {imp}", "ERR", 0, str(e))
-except Exception as e:
-    print("curl_cffi unavailable:", e, flush=True)
+            c = f"ERR:{type(e).__name__}"
+        codes.append(c)
+        if c == 403 and first_403 is None:
+            first_403 = i
+        if delay:
+            time.sleep(delay)
+    ok = sum(1 for c in codes if c == 200)
+    print(f"  200s={ok}/{len(codes)}  first_403_at={first_403}  seq={codes}", flush=True)
 
-# 3) Google News RSS (Cloudflare 우회 대체 소스)
-try:
-    r = requests.get(GOOGLE_NEWS, headers={"User-Agent": "Mozilla/5.0"}, timeout=15)
-    n_items = r.text.count("<item>")
-    line("google-news RSS (site:hankyung)", r.status_code, len(r.content), f"items={n_items}")
-except Exception as e:
-    line("google-news RSS (site:hankyung)", "ERR", 0, str(e))
+
+# 1) 무지연 연속 요청(현재 collector와 유사한 버스트)
+run("plain curl UA, no delay", 0.0)
+# 2) 0.5s 지연
+run("plain curl UA, 0.5s delay", 0.5)
+# 3) curl_cffi safari, 무지연
+run("curl_cffi safari, no delay", 0.0, use_cffi=True, impersonate="safari")
