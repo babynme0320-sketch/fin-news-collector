@@ -71,3 +71,41 @@ def test_market_data_returns_unavailable_on_symbol_failure(monkeypatch, tmp_path
 
     assert result.error is None
     assert result.indices[0].available is False
+
+
+def test_stale_days_counts_from_last_data_point():
+    from datetime import date, timedelta
+    from collectors.market_data import _days_since
+
+    assert _days_since(date.today().strftime("%Y-%m-%d")) == 0
+    assert _days_since((date.today() - timedelta(days=8)).strftime("%Y-%m-%d")) == 8
+
+
+def test_days_since_ignores_unparsable_date():
+    """날짜를 못 읽으면 경고하지 않는다 — 잘못된 경고는 경고 자체를 무시하게 만든다."""
+    from collectors.market_data import _days_since
+
+    assert _days_since("") == 0
+    assert _days_since("2026/09/25") == 0
+    assert _days_since(None) == 0
+
+
+def test_market_index_flags_stale_series():
+    from datetime import date, timedelta
+    from collectors.market_data import MarketDataCollector
+
+    collector = MarketDataCollector({})
+    old = (date.today() - timedelta(days=8)).strftime("%Y-%m-%d")
+    fresh = date.today().strftime("%Y-%m-%d")
+
+    stale = collector._create_market_index(
+        {"ticker": "KR_BOND_3Y", "name": "국고채 3년"},
+        [{"Date": old, "Close": 4.0}, {"Date": old, "Close": 4.06}],
+    )
+    current = collector._create_market_index(
+        {"ticker": "^KS11", "name": "KOSPI"},
+        [{"Date": fresh, "Close": 100.0}, {"Date": fresh, "Close": 101.0}],
+    )
+
+    assert stale.stale_days == 8
+    assert current.stale_days == 0

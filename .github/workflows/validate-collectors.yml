@@ -19,6 +19,19 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: KST 날짜 설정
+        run: echo "TODAY_KST=$(TZ=Asia/Seoul date +%Y%m%d)" >> $GITHUB_ENV
+
+      # 직전 실행의 소스별 건수. 없으면 급감 비교를 못 하므로 반드시 보존한다.
+      # 키를 날짜로 두면 하루 1개만 생성되고, restore-keys가 가장 최근 것을 이어받는다.
+      - name: 검증 상태 캐시
+        uses: actions/cache@v4
+        with:
+          path: data/validate_state.json
+          key: validate-state-${{ env.TODAY_KST }}
+          restore-keys: |
+            validate-state-
+
       - name: 패키지 설치
         run: pip install -r requirements.txt
 

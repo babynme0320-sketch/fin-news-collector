@@ -57,6 +57,7 @@ python run.py
 ### `sources.yaml`
 
 - `web_sources`: HTML/PDF 기반 소스 목록
+- `interest_keywords`: 제목에 들어가면 "⭐ 관심" 섹션으로 모을 키워드
 - `summary`: 오늘의 핵심 요약 (모델·헤드라인 수·문장 수)
 - `notify`: 텔레그램 알림 (활성화 여부·발송 시각·리포트 URL)
 - `fomc.include`: FOMC에서 가져올 문서 종류 (`statement` / `minutes` / `projections`)

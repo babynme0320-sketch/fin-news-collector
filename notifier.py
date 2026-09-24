@@ -122,7 +122,8 @@ def _format_daily(
     else:
         lines.extend(["✨ 오늘의 핵심", "• 요약을 만들지 못했습니다 (아래 리포트에서 확인)", ""])
 
-    movers = [idx for idx in indices if idx.available]
+    # 값이 멈춘 지표는 뺀다. 브리핑에서 오래된 등락률은 없는 것보다 나쁘다.
+    movers = [idx for idx in indices if idx.available and idx.stale_days < 3]
     if movers:
         lines.append("📈 주요 지수")
         for idx in _top_movers(movers, config.get("max_movers", 6)):

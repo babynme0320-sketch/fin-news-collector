@@ -18,6 +18,7 @@ from pathlib import Path
 import requests
 
 from collectors.base import Article, CollectorResult
+from textutil import content_tokens
 
 API_URL = "https://api.deepseek.com/chat/completions"
 MODEL = "deepseek-flash"
@@ -175,32 +176,8 @@ def _is_grounded(text: str, corpus: str, min_ratio: float) -> bool:
     return hits / len(tokens) >= min_ratio
 
 
-_PARTICLES = (
-    "으로써", "으로서", "에서는", "에게서", "이라고", "라는", "이라는", "에서", "에게",
-    "으로", "로써", "까지", "부터", "보다", "처럼", "만큼", "이며", "이고", "인", "은",
-    "는", "이", "가", "을", "를", "의", "에", "와", "과", "도", "로", "만", "나", "며",
-)
-
-_STOPWORDS = {
-    "오늘", "이번", "지난", "관련", "대한", "위해", "통해", "따라", "대해", "가운데",
-    "전망", "발표", "지적", "강조", "나타", "밝혔", "있다", "했다", "된다", "이며",
-}
-
-
-def _content_tokens(text: str) -> list[str]:
-    """문장에서 검증 대상 단어만 뽑는다(조사·기호·불용어 제거)."""
-    tokens = []
-    for chunk in re.split(r"[\s,·…·、。\"'()\[\]{}<>~\-—]+", text):
-        token = chunk.strip(".,!?%\"'")
-        if len(token) < 2:
-            continue
-        for particle in _PARTICLES:
-            if len(token) > len(particle) + 1 and token.endswith(particle):
-                token = token[: -len(particle)]
-                break
-        if len(token) >= 2 and token not in _STOPWORDS:
-            tokens.append(token)
-    return tokens
+# 단어 추출은 클러스터링과 공유한다(textutil).
+_content_tokens = content_tokens
 
 
 def main(argv: list[str]) -> int:
