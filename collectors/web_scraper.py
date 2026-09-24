@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from html import unescape
 from urllib.parse import urljoin
 
@@ -104,6 +105,14 @@ class WebScraperCollector:
         href = link_element.get("href") or link_element.get_text(" ", strip=True)
         if not title or not href:
             return None
+
+        # 일부 사이트는 href가 javascript:downConfirm('https://...') 형태라 URL이 안에 들어 있다.
+        link_pattern = self.config.get("link_pattern")
+        if link_pattern:
+            match = re.search(link_pattern, href)
+            if not match:
+                return None
+            href = match.group(1)
 
         filter_text = self.config.get("filter_title_contains")
         if filter_text and filter_text not in title:

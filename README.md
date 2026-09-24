@@ -9,7 +9,7 @@ macOS에서 금융 뉴스와 리포트를 모아 HTML 데일리 리포트를 만
 - 지난 리포트 아카이브 (`reports/archive/` → `docs/archive/`, 영구 보관)
 - 텔레그램 알림 (하루 1회 브리핑 + 속보 즉시)
 - FOMC 성명서·의사록·경제전망(SEP) PDF 수집
-- KB금융 리서치 PDF 링크 수집
+- 미래에셋·KB금융 리서치 PDF 링크 수집
 - 하나증권 유튜브 댓글의 고정 PDF 링크 수집
 - KOSPI, KOSDAQ, S&P500, NASDAQ 지수 카드 생성
 - 날짜별 PDF 저장 및 HTML 리포트 생성
@@ -70,6 +70,19 @@ python run.py
 
 한국경제는 RSS(`/feed/*`)가 Cloudflare 챌린지로 403을 반환해 섹션 HTML 페이지를 긁습니다.
 목록에 날짜가 없는 기사는 기사 URL의 `YYYYMMDD`로 날짜를 복원하므로 셀렉터가 비어도 날짜는 맞습니다.
+
+## 소스 추가 시 알아둘 것
+
+`web_sources`에 항목을 넣으면 코드 수정 없이 섹션이 늘어납니다. 다만 사이트마다 걸리는 함정이 있어 옵션을 몇 가지 뒀습니다.
+
+| 옵션 | 쓰는 곳 | 이유 |
+| :--- | :--- | :--- |
+| `encoding` | 미래에셋 (EUC-KR) | 없으면 제목이 깨진다 |
+| `link_pattern` | 미래에셋 | href가 `javascript:downConfirm('https://…')` 형태라 안에서 URL만 뽑아야 한다 |
+| `lede_url` | 한국경제 | 목록에 요약이 없어 기사 페이지의 `og:description`을 가져온다 |
+| `inspect_article_section` | (구) 한경 RSS | 기사별 섹션 판정 — 요청이 배로 늘어 되도록 쓰지 않는다 |
+
+JS로만 렌더되는 사이트(네이버 금융 신규 페이지, 삼성증권 등)는 정적 요청으로는 불가능합니다.
 
 ## 오늘의 핵심 요약
 
