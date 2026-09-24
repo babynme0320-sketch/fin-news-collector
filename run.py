@@ -12,6 +12,7 @@ import yaml
 
 from collectors.base import Article, CollectorResult
 from collectors.econ_indicator import EconIndicatorCollector
+from collectors.fomc import FomcCollector
 from collectors.hana_brief import HanaBriefCollector
 from collectors.market_data import MarketDataCollector
 from collectors.web_scraper import WebScraperCollector
@@ -197,6 +198,10 @@ def main() -> Path:
     sokbo_result = _build_sokbo_result(fresh_articles)
     if sokbo_result.items:
         results.insert(0, sokbo_result)
+
+    fomc_config = config.get("fomc", {})
+    if fomc_config.get("enabled", True):
+        results.append(FomcCollector(fomc_config).collect())
 
     hana_config = config.get("hana_brief", {})
     if hana_config.get("enabled", True):

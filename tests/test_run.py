@@ -50,12 +50,21 @@ housekeeping:
             calls.append(("market-collect", True))
             return CollectorResult(source_name="주요 증시", kind="market")
 
+    class FakeFomcCollector:
+        def __init__(self, config):
+            calls.append(("fomc-init", config))
+
+        def collect(self):
+            calls.append(("fomc-collect", True))
+            return CollectorResult(source_name="연준 보고서")
+
     rendered = {}
     opened = {}
 
     monkeypatch.setattr(run, "WebScraperCollector", FakeWebCollector)
     monkeypatch.setattr(run, "HanaBriefCollector", FakeHanaCollector)
     monkeypatch.setattr(run, "MarketDataCollector", FakeMarketCollector)
+    monkeypatch.setattr(run, "FomcCollector", FakeFomcCollector)
     monkeypatch.setattr(
         run,
         "render_report",
@@ -66,11 +75,12 @@ housekeeping:
     output = run.main()
 
     assert output == rendered["path"]
-    assert rendered["count"] == 4
+    assert rendered["count"] == 5
     assert opened["uri"].startswith("file://")
     assert ("web-collect", "한국경제") in calls
     assert ("hana-collect", True) in calls
     assert ("market-collect", True) in calls
+    assert ("fomc-collect", True) in calls
 
 
 def test_cleanup_old_outputs_removes_entries_older_than_retention(tmp_path: Path):

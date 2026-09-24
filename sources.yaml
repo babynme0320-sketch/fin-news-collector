@@ -127,18 +127,6 @@ web_sources:
     max_items: 5
     encoding: "utf-8"
 
-  - name: "연준 보고서"
-    enabled: true
-    url: "https://www.federalreserve.gov/monetarypolicy/fomc.htm"
-    type: "pdf_links"
-    selectors:
-      list_container: "div.panel__fr-consumer-help"
-      item: "ul.clean li"
-      title: "a"
-      link: "a[href$='.pdf']"
-    max_items: 5
-    encoding: "utf-8"
-
   - name: "KB금융 리서치"
     enabled: true
     url: "https://www.kbsec.com/go.able?linkcd=s040203010001"
@@ -162,6 +150,16 @@ web_sources:
     encoding: "utf-8"
 
 # 특수 수집 로직(API/SDK) → 전용 클래스 유지
+# FOMC 회의자료: 회의 달력 페이지에서 성명서·의사록·경제전망 PDF 링크를 뽑는다.
+fomc:
+  enabled: true
+  url: "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm"
+  include:
+    - "statement"    # 성명서 (회의 종료일 기준)
+    - "minutes"      # 의사록 (공표일 기준, 회의 3주 뒤)
+    - "projections"  # 경제전망 SEP (3·6·9·12월 회의, 회의 종료일 기준)
+  max_items: 8
+
 hana_brief:
   enabled: true
   channel_id: "UCP8KMauNQ5YhTL8fzoSYcfQ"
