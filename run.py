@@ -16,6 +16,7 @@ from collectors.fomc import FomcCollector
 from collectors.hana_brief import HanaBriefCollector
 from collectors.market_data import MarketDataCollector
 from collectors.web_scraper import WebScraperCollector
+from reporter.archive import build_index
 from reporter.renderer import render_report
 
 REPORT_DATE_PATTERN = re.compile(r"report_(\d{8})\.html$")
@@ -215,7 +216,14 @@ def main() -> Path:
 
     today = datetime.now(KST).strftime("%Y%m%d")
     output_path = Path("reports") / f"report_{today}.html"
-    render_report(results, output_path)
+    render_report(results, output_path, archive_href="archive/")
+
+    # 보관본은 최신 리포트로 돌아가는 링크가 필요해 archive_href만 바꿔 한 번 더 렌더한다.
+    archive_dir = Path("reports") / "archive"
+    archived_path = archive_dir / f"{today}.html"
+    render_report(results, archived_path, archive_href="../")
+    build_index(archive_dir)
+
     if not os.getenv("CI"):
         webbrowser.open(output_path.resolve().as_uri())
     return output_path

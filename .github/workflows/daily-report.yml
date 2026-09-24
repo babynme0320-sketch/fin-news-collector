@@ -68,15 +68,17 @@ jobs:
       - name: 리포트 생성
         run: python run.py
 
-      - name: docs/에 최신 리포트 복사
+      - name: docs/에 최신 리포트 + 아카이브 발행
         run: |
           mkdir -p docs
           cp reports/report_${TODAY_KST}.html docs/index.html
+          # CI에는 오늘치만 있으므로 기존 아카이브에 추가하고, 목록은 docs/archive 전체 기준으로 다시 만든다.
+          python -m reporter.archive add reports/report_${TODAY_KST}.html docs/archive
 
       - name: 커밋 & 푸시
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add docs/index.html
+          git add docs
           git diff --staged --quiet || git commit -m "report: $(TZ=Asia/Seoul date +'%Y-%m-%d') 금융 데일리"
           git push
