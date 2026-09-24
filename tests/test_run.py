@@ -65,14 +65,17 @@ housekeeping:
     monkeypatch.setattr(run, "HanaBriefCollector", FakeHanaCollector)
     monkeypatch.setattr(run, "MarketDataCollector", FakeMarketCollector)
     monkeypatch.setattr(run, "FomcCollector", FakeFomcCollector)
-    def fake_render(results, output_path, archive_href=""):
+    def fake_render(results, output_path, archive_href="", summary=None):
         rendered.setdefault("count", len(results))
         rendered.setdefault("path", output_path)
         rendered.setdefault("renders", []).append((str(output_path), archive_href))
+        rendered["summary"] = summary
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_text("<html></html>", encoding="utf-8")
 
     monkeypatch.setattr(run, "render_report", fake_render)
+    # 요약은 실제 API를 타므로 네트워크 없이 배선만 확인한다.
+    monkeypatch.setattr(run, "summarize", lambda results, config: {"points": ["핵심"], "keywords": []})
     monkeypatch.setattr(run.webbrowser, "open", lambda uri: opened.update({"uri": uri}))
 
     output = run.main()
@@ -90,6 +93,33 @@ housekeeping:
     assert hrefs == {"archive/", "../"}
     assert any(path.endswith("report_") or "report_" in path for path, _ in rendered["renders"])
     assert (tmp_path / "reports" / "archive" / "index.html").exists()
+    # 요약이 두 렌더 모두에 전달된다(보관본도 그날의 요약을 담아야 한다).
+    assert rendered["summary"] == {"points": ["핵심"], "keywords": []}
+
+
+def test_main_skips_summary_when_disabled(monkeypatch, tmp_path: Path):
+    monkeypatch.chdir(tmp_path)
+    Path("sources.yaml").write_text(
+        """
+web_sources: []
+summary:
+  enabled: false
+housekeeping:
+  retention_days: 10
+""".strip(),
+        encoding="utf-8",
+    )
+
+    called = []
+    monkeypatch.setattr(run, "summarize", lambda results, config: called.append(True) or {"points": ["x"]})
+    monkeypatch.setattr(run, "render_report", lambda *a, **kw: None)
+    monkeypatch.setattr(run, "FomcCollector", lambda config: type("C", (), {"collect": lambda self: CollectorResult(source_name="연준 보고서")})())
+    monkeypatch.setattr(run, "HanaBriefCollector", lambda config: type("C", (), {"collect": lambda self: CollectorResult(source_name="하나")})())
+    monkeypatch.setattr(run, "MarketDataCollector", lambda config: type("C", (), {"collect": lambda self: CollectorResult(source_name="시장", kind="market")})())
+
+    run.main()
+
+    assert called == []
 
 
 def test_cleanup_old_outputs_removes_entries_older_than_retention(tmp_path: Path):
