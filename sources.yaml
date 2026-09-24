@@ -2,70 +2,55 @@
 # 새 웹/PDF 소스 추가: 이 파일에 항목 추가, 코드 수정 불필요
 
 web_sources:
+  # 전체 기사용(기본 비활성). RSS(/feed/*)는 403이므로 HTML 페이지를 사용한다.
   - name: "한국경제"
     enabled: false
-    url: "https://www.hankyung.com/feed/all-news"
+    url: "https://www.hankyung.com/"
     type: "articles"
-    parser: "lxml-xml"
+    parser: "html.parser"
     selectors:
       list_container: ""
-      item: "item"
-      title: "title"
-      link: "link"
-      date: "pubDate"
-      lede: "description"
+      item: "div.news-item"
+      title: ".news-tit a"
+      link: ".news-tit a"
+      date: "p.txt-date, p.date"
+      lede: "p.lead"
     max_items: 10
     encoding: "utf-8"
 
+  # 한경 RSS(/feed/*)는 Cloudflare 인터랙티브 챌린지가 걸려 403 → 섹션 HTML 페이지를 사용.
+  # 섹션 페이지는 주제가 이미 분리되어 있어 기사별 섹션 필터링(inspect_article_section)이 불필요하다.
   - name: "한국경제 금융·마켓"
     enabled: true
-    url: "https://www.hankyung.com/feed/finance"
+    url: "https://www.hankyung.com/industry"
     type: "articles"
-    parser: "lxml-xml"
+    parser: "html.parser"
     selectors:
       list_container: ""
-      item: "item"
-      title: "title"
-      link: "link"
-      date: "pubDate"
-      lede: "description"
-      category: "category"
+      item: "div.news-item"
+      title: ".news-tit a"
+      link: ".news-tit a"
+      date: "p.txt-date, p.date"
+      lede: "p.lead"
+      lede_url: true
     max_items: 8
     encoding: "utf-8"
-    inspect_article_section: true
-    allowed_article_sections_any:
-      - "금융"
-      - "증권"
-      - "마켓"
-      - "시장"
-      - "기업"
-      - "부동산"
-      - "경제"
 
   - name: "한국경제 경제"
     enabled: true
-    url: "https://www.hankyung.com/feed/economy"
+    url: "https://www.hankyung.com/economy"
     type: "articles"
-    parser: "lxml-xml"
+    parser: "html.parser"
     selectors:
       list_container: ""
-      item: "item"
-      title: "title"
-      link: "link"
-      date: "pubDate"
-      lede: "description"
-      category: "category"
+      item: "div.news-item"
+      title: ".news-tit a"
+      link: ".news-tit a"
+      date: "p.txt-date, p.date"
+      lede: "p.lead"
+      lede_url: true
     max_items: 8
     encoding: "utf-8"
-    inspect_article_section: true
-    allowed_article_sections_any:
-      - "경제"
-      - "금융"
-      - "증권"
-      - "마켓"
-      - "시장"
-      - "기업"
-      - "부동산"
 
   - name: "CNBC 경제"
     enabled: true
@@ -114,16 +99,16 @@ web_sources:
 
   - name: "한국경제 사설"
     enabled: true
-    url: "https://www.hankyung.com/feed/opinion"
+    url: "https://www.hankyung.com/opinion"
     type: "articles"
-    parser: "lxml-xml"
+    parser: "html.parser"
     selectors:
       list_container: ""
-      item: "item"
-      title: "title"
-      link: "link"
-      date: "pubDate"
-      lede: "description"
+      item: "div.news-item"
+      title: ".news-tit a"
+      link: ".news-tit a"
+      date: "p.txt-date, p.date"
+      lede: "p.lead"
     max_items: 9
     encoding: "utf-8"
 
