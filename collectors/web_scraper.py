@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from html import unescape
 from urllib.parse import urljoin
 
 import requests
@@ -346,9 +347,9 @@ class WebScraperCollector:
 
     def _fetch_lede(self, url: str) -> str:
         metadata = self._fetch_article_metadata(url)
-        if metadata.get("description"):
-            return metadata["description"][:200]
-        return metadata.get("first_paragraph", "")
+        # og:description은 "제목, 요약" 형태로 오고 HTML 엔티티(&hellip; 등)가 섞여 있다.
+        raw = metadata.get("description") or metadata.get("first_paragraph", "")
+        return unescape(raw)[:200]
 
     def _download(self, url: str) -> str:
         try:

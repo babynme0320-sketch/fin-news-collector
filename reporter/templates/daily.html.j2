@@ -285,6 +285,14 @@
       color: var(--muted);
       font-size: 14px;
     }
+    /* 일부 소스만 실패한 섹션: 항목은 그대로 보여주고 실패 사실만 위에 알린다 */
+    .partial-msg {
+      padding: 10px 16px;
+      color: #b45309;
+      font-size: 12px;
+      background: var(--down-bg);
+      border-bottom: 1px solid var(--line);
+    }
 
     /* ── 차트 모달 (모바일 풀스크린) ─────────── */
     .modal-overlay {
@@ -560,11 +568,14 @@
         {% if is_sokbo %}🚨 속보{% else %}{{ section.name }}{% endif %}
         {% if section.entries %}<span class="item-count">{{ section.entries | length }}건</span>{% endif %}
       </div>
-      {% if section.error %}
+      {% if not section.entries and section.error %}
       <div class="error-msg">⚠️ 수집 실패: {{ section.error }}</div>
       {% elif not section.entries %}
       <div class="empty-msg">수집된 항목 없음</div>
       {% else %}
+        {% if section.error %}
+        <div class="partial-msg">⚠️ 일부 소스 수집 실패 — {{ section.error }}</div>
+        {% endif %}
         {% for item in section.entries %}
         <div class="news-item">
           <a class="item-link" href="{{ item.url }}" target="_blank" rel="noopener noreferrer">{{ item.title }}</a>

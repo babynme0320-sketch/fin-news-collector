@@ -132,3 +132,45 @@ def test_apply_merge_groups_excludes_broad_hankyung_source():
     hankyung = next(result for result in merged if result.source_name == "한국경제")
 
     assert [item.title for item in hankyung.items] == ["코스피 급등", "환율 하락"]
+
+
+def test_apply_merge_groups_keeps_surviving_items_and_names_failed_source():
+    """병합 그룹의 한 소스가 실패해도 다른 소스 항목은 유지되고, 실패한 소스 이름이 남는다."""
+    failing = CollectorResult(
+        source_name="한국경제 사설",
+        error="403 Client Error: Forbidden",
+    )
+    ok = CollectorResult(
+        source_name="매일경제 사설",
+        items=[
+            Article(
+                title="매일경제 사설",
+                url="https://example.com/opinion/1",
+                date="2026-09-24",
+            )
+        ],
+    )
+
+    merged = run._apply_merge_groups([failing, ok])
+    editorial = next(result for result in merged if result.source_name == "사설")
+
+    assert [item.title for item in editorial.items] == ["매일경제 사설"]
+    assert "한국경제 사설" in editorial.error
+    assert "403" in editorial.error
+
+
+def test_apply_merge_groups_has_no_error_when_all_members_succeed():
+    ok_a = CollectorResult(
+        source_name="한국경제 금융·마켓",
+        items=[Article(title="A", url="https://example.com/a", date="2026-09-24")],
+    )
+    ok_b = CollectorResult(
+        source_name="한국경제 경제",
+        items=[Article(title="B", url="https://example.com/b", date="2026-09-24")],
+    )
+
+    merged = run._apply_merge_groups([ok_a, ok_b])
+    hankyung = next(result for result in merged if result.source_name == "한국경제")
+
+    assert hankyung.error is None
+    assert [item.title for item in hankyung.items] == ["A", "B"]

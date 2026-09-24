@@ -13,6 +13,12 @@ def test_hana_brief_requires_real_channel_id(monkeypatch):
 
 
 def test_hana_brief_extracts_pdf_links(monkeypatch):
+    # 직접 URL 탐색은 실제 네트워크(file.hanaw.com)를 타므로 차단해 폴백 경로를 검증한다.
+    monkeypatch.setattr(
+        "collectors.hana_brief.HanaBriefCollector._collect_via_direct_urls",
+        lambda self: [],
+    )
+
     class DummyResponse:
         def __init__(self, text):
             self.text = text

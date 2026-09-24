@@ -153,7 +153,9 @@ def _apply_merge_groups(results: list[CollectorResult]) -> list[CollectorResult]
                 if url not in seen_urls:
                     seen_urls.add(url)
                     merged.items.append(item)
-        merged.error = next((r.error for r in group if r.error), None)
+        # 일부만 실패한 경우에도 남은 항목은 살린다. 실패한 소스는 이름과 함께 병기.
+        failures = [f"{r.source_name}: {r.error}" for r in group if r.error]
+        merged.error = " / ".join(failures) if failures else None
         merged_out.append(merged)
         consumed.update(members)
 

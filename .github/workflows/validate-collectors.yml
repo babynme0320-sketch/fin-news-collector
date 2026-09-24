@@ -1,0 +1,26 @@
+name: 수집 검증
+
+on:
+  schedule:
+    - cron: '37 2 * * *'   # 11:37 KST — 데일리 리포트와 겹치지 않게
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 패키지 설치
+        run: pip install -r requirements.txt
+
+      - name: 전체 소스 수집 검증
+        run: python validate_collectors.py
