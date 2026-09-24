@@ -150,6 +150,25 @@ web_sources:
     encoding: "utf-8"
 
 # 특수 수집 로직(API/SDK) → 전용 클래스 유지
+# 알림: 하루 1회 브리핑 + 속보 즉시. enabled를 true로 바꾸고 자격증명을 넣어야 동작한다.
+#   텔레그램 봇 토큰/chat id는 환경변수 TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID 로 넣는 것을 권장
+#   (CI에서는 GitHub Secrets). 없으면 조용히 아무것도 보내지 않는다.
+notify:
+  enabled: false
+  report_url: "https://babynme0320-sketch.github.io/fin-news-collector/"
+  daily_after_hour: 6      # KST 기준 이 시간 이후 첫 실행에서 하루 1회 발송
+  max_movers: 6            # 브리핑에 넣을 지수 개수(변동 폭 큰 순)
+  # bot_token: ""          # 또는 환경변수로
+  # chat_id: ""            # 또는 환경변수로
+
+# 오늘의 핵심 요약: 수집된 헤드라인을 LLM에 넘겨 5줄 요약 + 키워드를 받는다.
+# 키는 DEEPSEEK_API_KEY 환경변수 또는 ~/.deepseek_key. 없으면 요약 없이 리포트만 생성된다.
+summary:
+  enabled: true
+  model: "deepseek-flash"
+  max_headlines: 60
+  max_points: 5
+
 # FOMC 회의자료: 회의 달력 페이지에서 성명서·의사록·경제전망 PDF 링크를 뽑는다.
 fomc:
   enabled: true

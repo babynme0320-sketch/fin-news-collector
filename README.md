@@ -5,6 +5,9 @@ macOS에서 금융 뉴스와 리포트를 모아 HTML 데일리 리포트를 만
 ## 기능
 
 - 한국경제 기사 수집 (금융·마켓 / 경제 / 사설 — 섹션 HTML 페이지)
+- 오늘의 핵심 요약 (헤드라인을 LLM으로 5줄 요약 + 키워드)
+- 지난 리포트 아카이브 (`reports/archive/` → `docs/archive/`, 영구 보관)
+- 텔레그램 알림 (하루 1회 브리핑 + 속보 즉시)
 - FOMC 성명서·의사록·경제전망(SEP) PDF 수집
 - KB금융 리서치 PDF 링크 수집
 - 하나증권 유튜브 댓글의 고정 PDF 링크 수집
@@ -20,12 +23,16 @@ macOS에서 금융 뉴스와 리포트를 모아 HTML 데일리 리포트를 만
 fin-news-collector/
 ├── run.py
 ├── sources.yaml
+├── summarizer.py            # 오늘의 핵심 요약 (생성 + 근거 검증)
+├── notifier.py              # 텔레그램 알림 (하루 1회 브리핑 + 속보)
 ├── validate_collectors.py   # 전체 소스 수집 검증 (0건/오류 시 exit 1)
 ├── collectors/
 ├── reporter/
+│   └── archive.py           # 지난 리포트 보관 + 목록 생성
 ├── tests/
 ├── data/
 ├── reports/
+│   └── archive/             # 날짜별 리포트 (발행 시 docs/archive 로 복사)
 └── launchd/
 ```
 
@@ -50,6 +57,8 @@ python run.py
 ### `sources.yaml`
 
 - `web_sources`: HTML/PDF 기반 소스 목록
+- `summary`: 오늘의 핵심 요약 (모델·헤드라인 수·문장 수)
+- `notify`: 텔레그램 알림 (활성화 여부·발송 시각·리포트 URL)
 - `fomc.include`: FOMC에서 가져올 문서 종류 (`statement` / `minutes` / `projections`)
 - `hana_brief.channel_id`: 하나증권 공식 유튜브 채널 ID
 - `hana_brief.max_videos`: 최근 몇 개 영상까지 확인할지 설정
@@ -60,6 +69,34 @@ python run.py
 
 한국경제는 RSS(`/feed/*`)가 Cloudflare 챌린지로 403을 반환해 섹션 HTML 페이지를 긁습니다.
 목록에 날짜가 없는 기사는 기사 URL의 `YYYYMMDD`로 날짜를 복원하므로 셀렉터가 비어도 날짜는 맞습니다.
+
+## 오늘의 핵심 요약
+
+수집된 헤드라인을 LLM에 넘겨 5줄 요약과 키워드를 받아 리포트 최상단에 넣습니다.
+DEEPSEEK_API_KEY 환경변수나 `~/.deepseek_key` 파일이 필요하고, 없으면 요약 없이 리포트만 생성됩니다.
+
+모델이 헤드라인에 없는 내용을 지어내는 문제가 실제로 확인돼(없는 인물·없는 금리 인상),
+생성된 문장을 수집 텍스트와 대조해 근거 없는 문장은 버립니다(`summarizer._is_grounded`).
+숫자가 하나라도 근거에 없으면 그 문장은 탈락합니다. 근거 있는 문장이 3개 미만이면 요약을 넣지 않습니다.
+
+```bash
+python summarizer.py reports/report_YYYYMMDD.html   # 요약만 확인
+```
+
+## 알림 (텔레그램)
+
+`notify.enabled: true`로 바꾸고 자격증명을 넣으면 동작합니다. 없으면 조용히 건너뜁니다.
+
+1. 텔레그램에서 `@BotFather`로 봇을 만들고 토큰을 받습니다.
+2. 봇과 대화를 시작한 뒤 `https://api.telegram.org/bot<토큰>/getUpdates`에서 chat id를 확인합니다.
+3. 환경변수로 넣습니다 — 로컬은 셸 프로필, CI는 GitHub Secrets(`TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`).
+
+| 알림 | 시점 |
+| :--- | :--- |
+| 하루 1회 브리핑 | `daily_after_hour`(기본 06 KST) 이후 첫 실행. 요약 + 변동 큰 지수 + 링크 |
+| 속보 | `[속보]` 기사가 새로 잡히면 즉시. 같은 기사는 다시 보내지 않음 |
+
+발송 이력은 `data/notify_state.json`에 남고, CI에서는 캐시로 보존됩니다(없으면 실행마다 다시 보냅니다).
 
 ## 수집 검증
 

@@ -35,7 +35,10 @@ def _result_to_section(result: CollectorResult) -> dict:
 
 
 def render_report(
-    results: list[CollectorResult], output_path: Path, archive_href: str = ""
+    results: list[CollectorResult],
+    output_path: Path,
+    archive_href: str = "",
+    summary: dict | None = None,
 ) -> None:
     market_result = next((result for result in results if result.kind == "market"), None)
     econ_result = next((result for result in results if result.kind == "econ"), None)
@@ -65,6 +68,7 @@ def render_report(
         econ_indicators=econ_result.econ_indicators if econ_result else [],
         sections=[_result_to_section(result) for result in ordered_sections],
         archive_href=archive_href,
+        summary=summary,
     )
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(html, encoding="utf-8")

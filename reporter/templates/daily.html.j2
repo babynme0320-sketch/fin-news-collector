@@ -285,7 +285,52 @@
       color: var(--muted);
       font-size: 14px;
     }
-    /* 일부 소스만 실패한 섹션: 항목은 그대로 보여주고 실패 사실만 위에 알린다 */
+    /* ── 오늘의 핵심 ───────────────────────── */
+    .summary-section {
+      background: var(--surface);
+      border-radius: 16px;
+      overflow: hidden;
+      margin-bottom: 12px;
+      border: 1px solid var(--line);
+    }
+    .summary-points {
+      margin: 0;
+      padding: 14px 16px 10px 34px;
+      counter-reset: point;
+    }
+    .summary-points li {
+      font-size: 15px;
+      line-height: 1.6;
+      margin-bottom: 9px;
+      padding-left: 2px;
+    }
+    .summary-points li::marker {
+      color: var(--primary);
+      font-weight: 700;
+    }
+    .summary-keywords {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      padding: 0 16px 14px;
+    }
+    .summary-keywords .kw {
+      font-size: 12px;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 999px;
+      background: var(--primary-light);
+      color: var(--primary);
+    }
+    .summary-note {
+      padding: 10px 16px;
+      font-size: 11px;
+      color: var(--muted);
+      border-top: 1px solid var(--line);
+      background: var(--surface2);
+    }
+
+    /* 일부 소스만 실패한 섹션: 항목은 그대로 보여주고 항목 위에 실패 사실만 알린다 */
     .partial-msg {
       padding: 10px 16px;
       color: #b45309;
@@ -482,6 +527,7 @@
 
   <!-- 섹션 탭 네비 -->
   <nav class="nav-tabs">
+    {% if summary %}<a class="nav-tab" href="#summary">✨ 오늘의 핵심</a>{% endif %}
     <a class="nav-tab" href="#market">📈 증시</a>
     {% for section in sections %}
     <a class="nav-tab" href="#sec-{{ loop.index }}">{% if section.name == "속보" %}🚨 속보{% else %}{{ section.name }}{% endif %}</a>
@@ -492,6 +538,24 @@
   </nav>
 
   <main>
+
+    {% if summary %}
+    <!-- 오늘의 핵심: 80건을 훑기 전에 무엇이 중요한지 먼저 보여준다 -->
+    <div class="summary-section" id="summary">
+      <div class="section-head">✨ 오늘의 핵심</div>
+      <ol class="summary-points">
+        {% for point in summary.points %}
+        <li>{{ point }}</li>
+        {% endfor %}
+      </ol>
+      {% if summary.keywords %}
+      <div class="summary-keywords">
+        {% for keyword in summary.keywords %}<span class="kw">{{ keyword }}</span>{% endfor %}
+      </div>
+      {% endif %}
+      <div class="summary-note">수집된 헤드라인을 AI가 요약했습니다. 원문은 아래 섹션에서 확인하세요.</div>
+    </div>
+    {% endif %}
 
     <!-- 시장 지표 -->
     <div class="market-section" id="market">

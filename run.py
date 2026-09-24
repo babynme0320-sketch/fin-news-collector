@@ -16,8 +16,10 @@ from collectors.fomc import FomcCollector
 from collectors.hana_brief import HanaBriefCollector
 from collectors.market_data import MarketDataCollector
 from collectors.web_scraper import WebScraperCollector
+from notifier import notify_daily, notify_sokbo
 from reporter.archive import build_index
 from reporter.renderer import render_report
+from summarizer import summarize
 
 REPORT_DATE_PATTERN = re.compile(r"report_(\d{8})\.html$")
 KST = timezone(timedelta(hours=9))
@@ -214,15 +216,25 @@ def main() -> Path:
 
     results.append(EconIndicatorCollector().collect())
 
+    summary_config = config.get("summary", {})
+    summary = summarize(results, summary_config) if summary_config.get("enabled", True) else None
+
     today = datetime.now(KST).strftime("%Y%m%d")
     output_path = Path("reports") / f"report_{today}.html"
-    render_report(results, output_path, archive_href="archive/")
+    render_report(results, output_path, archive_href="archive/", summary=summary)
 
     # 보관본은 최신 리포트로 돌아가는 링크가 필요해 archive_href만 바꿔 한 번 더 렌더한다.
     archive_dir = Path("reports") / "archive"
     archived_path = archive_dir / f"{today}.html"
-    render_report(results, archived_path, archive_href="../")
+    render_report(results, archived_path, archive_href="../", summary=summary)
     build_index(archive_dir)
+
+    notify_config = config.get("notify", {})
+    if notify_config.get("enabled", False):
+        # 속보가 먼저다. 하루 1회 브리핑은 이미 보냈으면 조용히 넘어간다.
+        notify_sokbo(results, notify_config)
+        market_result = next((r for r in results if r.kind == "market"), None)
+        notify_daily(summary, market_result.indices if market_result else [], notify_config)
 
     if not os.getenv("CI"):
         webbrowser.open(output_path.resolve().as_uri())
