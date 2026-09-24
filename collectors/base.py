@@ -92,6 +92,7 @@ class MarketIndex:
     change_pct: float
     date: str
     available: bool = True
+    stale_days: int = 0  # 마지막 데이터가 며칠 전인지 (0이면 최신)
 
 
 @dataclass

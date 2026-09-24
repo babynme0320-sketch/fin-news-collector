@@ -17,6 +17,15 @@ TIMEOUT_SEC = 10
 CACHE_DIR = Path("data") / "history"
 
 
+def _days_since(date_str: str) -> int:
+    """마지막 데이터가 며칠 전 것인지. 파싱 실패 시 0(경고하지 않음)."""
+    try:
+        last = datetime.strptime(date_str, "%Y-%m-%d").date()
+    except (ValueError, TypeError):
+        return 0
+    return max(0, (date.today() - last).days)
+
+
 def _scrape_naver_bond(marketindex_cd: str, pages: int = 20) -> list[dict]:
     headers = {
         "User-Agent": (
@@ -190,6 +199,7 @@ class MarketDataCollector:
                 change_pct=round(change_pct, 2),
                 date=last["Date"],
                 available=True,
+                stale_days=_days_since(last["Date"]),
             )
         elif len(history) == 1:
             last = history[-1]
@@ -200,6 +210,7 @@ class MarketDataCollector:
                 change_pct=0.0,
                 date=last["Date"],
                 available=True,
+                stale_days=_days_since(last["Date"]),
             )
         else:
             return MarketIndex(

@@ -149,6 +149,16 @@ web_sources:
     max_items: 10
     encoding: "utf-8"
 
+# 관심 키워드: 제목에 이 말이 들어간 기사를 모아 상단에 "⭐ 관심" 섹션으로 보여준다.
+# 비워두면 섹션이 생기지 않는다. 본인 관심사에 맞게 고쳐 쓸 것.
+interest_keywords:
+  - "반도체"
+  - "환율"
+  - "금리"
+  - "부동산"
+  - "원전"
+  - "대미투자"
+
 # 특수 수집 로직(API/SDK) → 전용 클래스 유지
 # 알림: 하루 1회 브리핑 + 속보 즉시. enabled를 true로 바꾸고 자격증명을 넣어야 동작한다.
 #   텔레그램 봇 토큰/chat id는 환경변수 TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID 로 넣는 것을 권장
@@ -195,6 +205,9 @@ market_data:
     - { ticker: "^DJI", name: "다우존스" }
     - { ticker: "^GSPC", name: "S&P 500" }
     - { ticker: "^IXIC", name: "NASDAQ" }
+    # 주의: 국고채는 네이버 marketindex가 이전(stock.naver.com 개편)하면서 소스가 죽었다.
+    # interestDailyQuote.naver가 410을 반환해 새 데이터가 들어오지 않고, 캐시된 마지막 값이
+    # 카드에 "⚠️ N일 전" 표시와 함께 나온다. 살리려면 한국은행 ECOS API 키가 필요하다.
     - { ticker: "KR_BOND_3Y", name: "국고채 3년" }
     - { ticker: "^TNX", name: "미국채 10년" }
     - { ticker: "^TYX", name: "미국채 30년" }

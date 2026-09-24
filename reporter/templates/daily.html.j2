@@ -168,6 +168,15 @@
     .card-change.up   { color: var(--up); }
     .card-change.down { color: var(--down); }
     .card-change.flat { color: var(--flat); }
+    /* 값이 멈춘 지표: 현재값처럼 보이면 안 되므로 카드 자체를 흐리게 하고 기준일을 밝힌다 */
+    .card.stale { opacity: 0.72; }
+    .card.stale .card-price { text-decoration: underline dotted var(--muted); }
+    .card-stale {
+      font-size: 10px;
+      color: #b45309;
+      margin-top: 4px;
+      font-weight: 600;
+    }
     .chart-hint {
       position: absolute;
       top: 10px; right: 10px;
@@ -202,6 +211,14 @@
     }
     .sokbo-section .item-link {
       font-weight: 700;
+    }
+
+    /* ── 관심 섹션 (sources.yaml의 interest_keywords) ── */
+    .interest-section .section-head {
+      color: #b45309;
+    }
+    .interest-section .news-item {
+      border-left: 3px solid #f59e0b;
     }
 
     /* ── 뉴스 섹션 ─────────────────────────── */
@@ -530,7 +547,7 @@
     {% if summary %}<a class="nav-tab" href="#summary">✨ 오늘의 핵심</a>{% endif %}
     <a class="nav-tab" href="#market">📈 증시</a>
     {% for section in sections %}
-    <a class="nav-tab" href="#sec-{{ loop.index }}">{% if section.name == "속보" %}🚨 속보{% else %}{{ section.name }}{% endif %}</a>
+    <a class="nav-tab" href="#sec-{{ loop.index }}">{% if section.name == "속보" %}🚨 속보{% elif section.name == "관심" %}⭐ 관심{% else %}{{ section.name }}{% endif %}</a>
     {% endfor %}
     {% if archive_href %}
     <a class="nav-tab" href="{{ archive_href }}">📁 지난 리포트</a>
@@ -576,11 +593,14 @@
           </div>
           {% else %}
           {% set dir = "up" if idx.change_pct > 0 else ("down" if idx.change_pct < 0 else "flat") %}
-          <div class="card {{ dir }}" data-name="{{ idx.name }}">
+          <div class="card {{ dir }}{% if idx.stale_days >= 3 %} stale{% endif %}" data-name="{{ idx.name }}">
             <div class="chart-hint">📊</div>
             <div class="card-label">{{ idx.name }}</div>
             <div class="card-price">{{ "%.2f"|format(idx.price) }}</div>
             <div class="card-change {{ dir }}">{{ "+" if idx.change_pct > 0 else "" }}{{ "%.2f"|format(idx.change_pct) }}%</div>
+            {% if idx.stale_days >= 3 %}
+            <div class="card-stale">⚠️ {{ idx.date }} 기준 ({{ idx.stale_days }}일 전)</div>
+            {% endif %}
           </div>
           {% endif %}
         {% endfor %}
@@ -630,9 +650,10 @@
     <!-- 뉴스 섹션들 -->
     {% for section in sections %}
     {% set is_sokbo = section.name == "속보" %}
-    <div class="news-section{% if is_sokbo %} sokbo-section{% endif %}" id="sec-{{ loop.index }}">
+    {% set is_interest = section.name == "관심" %}
+    <div class="news-section{% if is_sokbo %} sokbo-section{% elif is_interest %} interest-section{% endif %}" id="sec-{{ loop.index }}">
       <div class="section-head">
-        {% if is_sokbo %}🚨 속보{% else %}{{ section.name }}{% endif %}
+        {% if is_sokbo %}🚨 속보{% elif is_interest %}⭐ 관심{% else %}{{ section.name }}{% endif %}
         {% if section.entries %}<span class="item-count">{{ section.entries | length }}건</span>{% endif %}
       </div>
       {% if not section.entries and section.error %}

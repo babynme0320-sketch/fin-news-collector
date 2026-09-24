@@ -140,6 +140,25 @@ def _build_sokbo_result(fresh_articles: list[Article]) -> CollectorResult:
     return result
 
 
+def _build_interest_result(results: list[CollectorResult], keywords: list[str]) -> CollectorResult | None:
+    """관심 키워드가 제목에 들어간 기사만 모은다. 없으면 섹션을 만들지 않는다."""
+    terms = [k for k in keywords if k]
+    if not terms:
+        return None
+
+    result = CollectorResult(source_name="관심", kind="section")
+    seen: set[str] = set()
+    for source in results:
+        for item in source.items:
+            if not isinstance(item, Article) or not item.url or item.url in seen:
+                continue
+            if any(term in item.title for term in terms):
+                seen.add(item.url)
+                result.items.append(item)
+
+    return result if result.items else None
+
+
 def _apply_merge_groups(results: list[CollectorResult]) -> list[CollectorResult]:
     merged_out: list[CollectorResult] = []
     consumed: set[str] = set()
@@ -201,6 +220,10 @@ def main() -> Path:
     sokbo_result = _build_sokbo_result(fresh_articles)
     if sokbo_result.items:
         results.insert(0, sokbo_result)
+
+    interest = _build_interest_result(results, config.get("interest_keywords", []))
+    if interest:
+        results.insert(1 if sokbo_result.items else 0, interest)
 
     fomc_config = config.get("fomc", {})
     if fomc_config.get("enabled", True):

@@ -42,7 +42,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: data/history
-          key: market-history-${{ github.run_id }}
+          key: market-history-${{ env.TODAY_KST }}
           restore-keys: |
             market-history-
 
@@ -50,7 +50,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: data/daily_cache
-          key: daily-news-${{ env.TODAY_KST }}-${{ github.run_id }}
+          key: daily-news-${{ env.TODAY_KST }}
           restore-keys: |
             daily-news-${{ env.TODAY_KST }}-
 
@@ -58,7 +58,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: data/daily_cache/sokbo.json
-          key: sokbo-${{ github.run_id }}
+          key: sokbo-${{ env.TODAY_KST }}
           restore-keys: |
             sokbo-
 
@@ -67,7 +67,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: data/notify_state.json
-          key: notify-state-${{ github.run_id }}
+          key: notify-state-${{ env.TODAY_KST }}
           restore-keys: |
             notify-state-
 
