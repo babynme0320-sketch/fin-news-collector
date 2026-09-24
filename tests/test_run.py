@@ -65,11 +65,14 @@ housekeeping:
     monkeypatch.setattr(run, "HanaBriefCollector", FakeHanaCollector)
     monkeypatch.setattr(run, "MarketDataCollector", FakeMarketCollector)
     monkeypatch.setattr(run, "FomcCollector", FakeFomcCollector)
-    monkeypatch.setattr(
-        run,
-        "render_report",
-        lambda results, output_path: rendered.update({"count": len(results), "path": output_path}),
-    )
+    def fake_render(results, output_path, archive_href=""):
+        rendered.setdefault("count", len(results))
+        rendered.setdefault("path", output_path)
+        rendered.setdefault("renders", []).append((str(output_path), archive_href))
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text("<html></html>", encoding="utf-8")
+
+    monkeypatch.setattr(run, "render_report", fake_render)
     monkeypatch.setattr(run.webbrowser, "open", lambda uri: opened.update({"uri": uri}))
 
     output = run.main()
@@ -81,6 +84,12 @@ housekeeping:
     assert ("hana-collect", True) in calls
     assert ("market-collect", True) in calls
     assert ("fomc-collect", True) in calls
+
+    # 메인 리포트 + 아카이브본 두 번 렌더되고, 각각 올바른 상대 경로를 받는다.
+    hrefs = {href for _path, href in rendered["renders"]}
+    assert hrefs == {"archive/", "../"}
+    assert any(path.endswith("report_") or "report_" in path for path, _ in rendered["renders"])
+    assert (tmp_path / "reports" / "archive" / "index.html").exists()
 
 
 def test_cleanup_old_outputs_removes_entries_older_than_retention(tmp_path: Path):

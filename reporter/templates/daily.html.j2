@@ -486,6 +486,9 @@
     {% for section in sections %}
     <a class="nav-tab" href="#sec-{{ loop.index }}">{% if section.name == "속보" %}🚨 속보{% else %}{{ section.name }}{% endif %}</a>
     {% endfor %}
+    {% if archive_href %}
+    <a class="nav-tab" href="{{ archive_href }}">📁 지난 리포트</a>
+    {% endif %}
   </nav>
 
   <main>
