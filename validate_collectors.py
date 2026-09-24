@@ -11,6 +11,7 @@ from pathlib import Path
 import yaml
 
 from collectors.base import CollectorResult
+from collectors.fomc import FomcCollector
 from collectors.hana_brief import HanaBriefCollector
 from collectors.market_data import MarketDataCollector
 from collectors.web_scraper import WebScraperCollector
@@ -43,13 +44,15 @@ def main() -> int:
         if not ok:
             failures.append(name)
 
-    hana_config = config.get("hana_brief", {})
-    market_config = config.get("market_data", {})
     extra_collectors = []
-    if hana_config.get("enabled", True):
-        extra_collectors.append(("하나증권 모닝브리프", HanaBriefCollector(hana_config)))
-    if market_config.get("enabled", True):
-        extra_collectors.append(("시장 지수", MarketDataCollector(market_config)))
+    for key, name, factory in (
+        ("fomc", "연준 보고서", FomcCollector),
+        ("hana_brief", "하나증권 모닝브리프", HanaBriefCollector),
+        ("market_data", "시장 지수", MarketDataCollector),
+    ):
+        section_config = config.get(key, {})
+        if section_config.get("enabled", True):
+            extra_collectors.append((name, factory(section_config)))
 
     for name, collector in extra_collectors:
         try:
