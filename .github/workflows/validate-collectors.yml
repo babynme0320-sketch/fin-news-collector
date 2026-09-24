@@ -1,6 +1,7 @@
 name: 수집 검증
 
 on:
+  push:                    # TEMP: 브랜치 검증용, 머지 전 제거
   schedule:
     - cron: '37 2 * * *'   # 11:37 KST — 데일리 리포트와 겹치지 않게
   workflow_dispatch:
