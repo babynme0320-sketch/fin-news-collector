@@ -127,6 +127,23 @@ web_sources:
     max_items: 5
     encoding: "utf-8"
 
+  # 미래에셋: href가 javascript:downConfirm('https://...') 형태라 link_pattern으로 URL을 뽑는다.
+  # 페이지가 EUC-KR이라 encoding을 지정하지 않으면 제목이 깨진다.
+  - name: "미래에셋 리서치"
+    enabled: true
+    url: "https://securities.miraeasset.com/bbs/board/message/list.do?categoryId=1521"
+    type: "pdf_links"
+    parser: "html.parser"
+    encoding: "euc-kr"
+    link_pattern: "downConfirm\\('([^']+)'"
+    selectors:
+      list_container: ""
+      item: "table tr"
+      title: "div.subject a"
+      link: "a[href^='javascript:downConfirm']"
+      date: "td:first-child"
+    max_items: 10
+
   - name: "KB금융 리서치"
     enabled: true
     url: "https://www.kbsec.com/go.able?linkcd=s040203010001"

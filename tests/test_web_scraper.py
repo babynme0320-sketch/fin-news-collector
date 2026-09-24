@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import requests
+from bs4 import BeautifulSoup
 
 from collectors.web_scraper import WebScraperCollector
 
@@ -304,3 +305,65 @@ def test_filters_by_article_section_when_feed_category_is_missing(monkeypatch):
 
     assert result.error is None
     assert [item.title for item in result.items] == ["시장 뉴스"]
+
+
+def test_link_pattern_extracts_url_from_javascript_href():
+    """미래에셋은 href가 javascript:downConfirm('https://...') 형태다."""
+    html = """
+    <table><tr>
+      <td>2026-09-24</td>
+      <td class="left"><div class="subject"><a href="javascript:view('1','2')">글로벌 마켓 브리핑</a></div></td>
+      <td><a href="javascript:downConfirm('https://e.com/a.pdf?id=1','1');" title="첨부">file</a></td>
+    </tr></table>
+    """
+    config = {
+        "name": "테스트",
+        "url": "https://e.com/list",
+        "type": "articles",
+        "link_pattern": r"downConfirm\('([^']+)'",
+        "selectors": {
+            "list_container": "",
+            "item": "tr",
+            "title": "div.subject a",
+            "link": "a[href^='javascript:downConfirm']",
+            "date": "td:first-child",
+        },
+    }
+    config["type"] = "pdf_links"
+    collector = WebScraperCollector(config)
+    collector._download = lambda url: ""
+
+    result = collector._parse_element(BeautifulSoup(html, 'html.parser').select_one("tr"), config["selectors"])
+
+    assert result is not None
+    title, url, date = result
+    assert title == "글로벌 마켓 브리핑"
+    assert url == "https://e.com/a.pdf?id=1"
+    assert date == "2026-09-24"
+
+
+def test_link_pattern_row_without_match_is_skipped():
+    html = """
+    <table><tr>
+      <td>2026-09-24</td>
+      <td><div class="subject"><a href="/article/1">제목</a></div></td>
+      <td><a href="/other">첨부 없음</a></td>
+    </tr></table>
+    """
+    config = {
+        "name": "테스트",
+        "url": "https://e.com/list",
+        "type": "articles",
+        "link_pattern": r"downConfirm\('([^']+)'",
+        "selectors": {
+            "list_container": "",
+            "item": "tr",
+            "title": "div.subject a",
+            "link": "td a",
+            "date": "td:first-child",
+        },
+    }
+
+    result = WebScraperCollector(config)._parse_element(BeautifulSoup(html, 'html.parser').select_one("tr"), config["selectors"])
+
+    assert result is None
