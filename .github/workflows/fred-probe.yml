@@ -1,0 +1,28 @@
+name: FRED 진단 (임시)
+on:
+  push:
+    branches: [probe/fred]
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: curl로 FRED 접근
+        run: |
+          echo "--- curl ---"
+          curl -s -o /tmp/f.csv -w "http=%{http_code} size=%{size_download} time=%{time_total}\n" --max-time 30 "https://fred.stlouisfed.org/graph/fredgraph.csv?id=FEDFUNDS" || echo "curl 실패: $?"
+          head -c 200 /tmp/f.csv 2>/dev/null; echo
+      - name: requests로 FRED 접근
+        run: |
+          pip install requests
+          python -c "
+import requests, sys
+try:
+    r = requests.get('https://fred.stlouisfed.org/graph/fredgraph.csv', params={'id':'FEDFUNDS'}, timeout=(10,30), headers={'User-Agent':'Mozilla/5.0'})
+    print('requests OK', r.status_code, len(r.text), repr(r.text[:80]))
+except Exception as e:
+    print('requests 실패:', type(e).__name__, e)
+"
