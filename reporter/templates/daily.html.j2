@@ -593,12 +593,12 @@
           </div>
           {% else %}
           {% set dir = "up" if idx.change_pct > 0 else ("down" if idx.change_pct < 0 else "flat") %}
-          <div class="card {{ dir }}{% if idx.stale_days >= 3 %} stale{% endif %}" data-name="{{ idx.name }}">
+          <div class="card {{ dir }}{% if idx.stale_days >= idx.stale_threshold %} stale{% endif %}" data-name="{{ idx.name }}">
             <div class="chart-hint">📊</div>
             <div class="card-label">{{ idx.name }}</div>
             <div class="card-price">{{ "%.2f"|format(idx.price) }}</div>
             <div class="card-change {{ dir }}">{{ "+" if idx.change_pct > 0 else "" }}{{ "%.2f"|format(idx.change_pct) }}%</div>
-            {% if idx.stale_days >= 3 %}
+            {% if idx.stale_days >= idx.stale_threshold %}
             <div class="card-stale">⚠️ {{ idx.date }} 기준 ({{ idx.stale_days }}일 전)</div>
             {% endif %}
           </div>

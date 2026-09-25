@@ -50,6 +50,14 @@ housekeeping:
             calls.append(("market-collect", True))
             return CollectorResult(source_name="주요 증시", kind="market")
 
+    class FakeEconCollector:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def collect(self):
+            calls.append(("econ-collect", True))
+            return CollectorResult(source_name="경제 지표", kind="econ")
+
     class FakeFomcCollector:
         def __init__(self, config):
             calls.append(("fomc-init", config))
@@ -65,6 +73,7 @@ housekeeping:
     monkeypatch.setattr(run, "HanaBriefCollector", FakeHanaCollector)
     monkeypatch.setattr(run, "MarketDataCollector", FakeMarketCollector)
     monkeypatch.setattr(run, "FomcCollector", FakeFomcCollector)
+    monkeypatch.setattr(run, "EconIndicatorCollector", FakeEconCollector)
     def fake_render(results, output_path, archive_href="", summary=None):
         rendered.setdefault("count", len(results))
         rendered.setdefault("path", output_path)
@@ -116,6 +125,7 @@ housekeeping:
     monkeypatch.setattr(run, "FomcCollector", lambda config: type("C", (), {"collect": lambda self: CollectorResult(source_name="연준 보고서")})())
     monkeypatch.setattr(run, "HanaBriefCollector", lambda config: type("C", (), {"collect": lambda self: CollectorResult(source_name="하나")})())
     monkeypatch.setattr(run, "MarketDataCollector", lambda config: type("C", (), {"collect": lambda self: CollectorResult(source_name="시장", kind="market")})())
+    monkeypatch.setattr(run, "EconIndicatorCollector", lambda *a, **kw: type("C", (), {"collect": lambda self: CollectorResult(source_name="경제 지표", kind="econ")})())
 
     run.main()
 

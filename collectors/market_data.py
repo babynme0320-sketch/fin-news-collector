@@ -3,18 +3,52 @@ from __future__ import annotations
 import csv
 from datetime import date, datetime, timedelta
 import io
-import os
 from pathlib import Path
 import contextlib
 
-import requests
-from bs4 import BeautifulSoup
 import yfinance as yf
 
 from .base import CollectorResult, MarketIndex
+from .fred import fetch_series
 
 TIMEOUT_SEC = 10
 CACHE_DIR = Path("data") / "history"
+
+
+FRED_PREFIX = "FRED:"
+
+
+def _fetch_yfinance(ticker: str, start: str) -> list[dict]:
+    """yfinance에서 (날짜, 종가)를 가져온다. 실패하면 빈 리스트."""
+    try:
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            hist = yf.Ticker(ticker).history(start=start, timeout=TIMEOUT_SEC)
+        return [
+            {"Date": date_val.strftime("%Y-%m-%d"), "Close": float(row["Close"])}
+            for date_val, row in hist.iterrows()
+        ]
+    except Exception:
+        return []
+
+
+def _write_cache(csv_path: Path, records: list[dict]) -> None:
+    try:
+        with open(csv_path, "w", encoding="utf-8", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=["Date", "Close"])
+            writer.writeheader()
+            writer.writerows(records)
+    except Exception:
+        pass
+
+
+def _read_cache(csv_path: Path) -> list[dict]:
+    if not csv_path.exists():
+        return []
+    try:
+        with open(csv_path, "r", encoding="utf-8") as f:
+            return [{"Date": row["Date"], "Close": float(row["Close"])} for row in csv.DictReader(f)]
+    except Exception:
+        return []
 
 
 def _days_since(date_str: str) -> int:
@@ -26,46 +60,26 @@ def _days_since(date_str: str) -> int:
     return max(0, (date.today() - last).days)
 
 
-def _scrape_naver_bond(marketindex_cd: str, pages: int = 20) -> list[dict]:
-    headers = {
-        "User-Agent": (
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
-        )
-    }
-    records = []
-    for page in range(1, pages + 1):
-        url = f"https://finance.naver.com/marketindex/interestDailyQuote.naver?marketindexCd={marketindex_cd}&page={page}"
-        try:
-            r = requests.get(url, headers=headers, timeout=10)
-            if r.status_code != 200:
-                break
-            soup = BeautifulSoup(r.text, "html.parser")
-            table = soup.select_one("table.tbl_exchange.today")
-            if not table:
-                break
-            rows = table.select("tbody tr")
-            if not rows:
-                break
+def _stale_threshold(history: list[dict]) -> int:
+    """지표 주기에서 경고 기준을 계산한다.
 
-            page_has_data = False
-            for tr in rows:
-                tds = tr.select("td")
-                if len(tds) >= 2:
-                    date_text = tds[0].get_text(strip=True).replace(".", "-")  # YYYY-MM-DD
-                    val_text = tds[1].get_text(strip=True)
-                    try:
-                        val = float(val_text)
-                        records.append({"Date": date_text, "Close": val})
-                        page_has_data = True
-                    except ValueError:
-                        continue
-            if not page_has_data:
-                break
-        except Exception:
-            break
-    records.sort(key=lambda x: x["Date"])
-    return records
+    일간 지표에 3일 기준을 쓰면 맞지만, 월간 지표(국고채·FRED 시리즈)에 그대로 쓰면
+    정상적으로 갱신되는 중인데도 매번 경고가 뜬다 — 경고가 늘 켜져 있으면 아무도 안 본다.
+    관측 간격의 중앙값 × 3을 기준으로 삼는다(주말·휴일 감안).
+    """
+    dates = []
+    for row in history[-40:]:
+        try:
+            dates.append(datetime.strptime(row["Date"], "%Y-%m-%d").date())
+        except (ValueError, KeyError, TypeError):
+            continue
+    if len(dates) < 3:
+        return 3
+
+    gaps = sorted((b - a).days for a, b in zip(dates, dates[1:]) if (b - a).days > 0)
+    if not gaps:
+        return 3
+    return max(3, gaps[len(gaps) // 2] * 3)
 
 
 class MarketDataCollector:
@@ -107,6 +121,15 @@ class MarketDataCollector:
         ticker = symbol_config["ticker"]
         csv_path = CACHE_DIR / f"{ticker}.csv"
 
+        # FRED 시리즈는 전체가 수백 행이라 증분 없이 통째로 받아 덮어쓴다.
+        if ticker.startswith(FRED_PREFIX):
+            records = fetch_series(ticker[len(FRED_PREFIX):])
+            if records:
+                _write_cache(csv_path, records)
+                return records
+            # 실패하면 기존 캐시로 버틴다(값이 없으면 _create_market_index가 처리).
+            return _read_cache(csv_path)
+
         existing_data = []
         last_date_str = None
 
@@ -122,49 +145,19 @@ class MarketDataCollector:
                 existing_data = []
 
         new_records = []
-        is_korean_bond = ticker.startswith("KR_BOND")
-        naver_cd = "IRR_GOVT03Y" if "3Y" in ticker else "IRR_GOVT10Y"
 
         if not existing_data:
             # 최초 30년 전체 수집 (Bootstrap)
-            if is_korean_bond:
-                new_records = _scrape_naver_bond(naver_cd, pages=30)
-            else:
-                try:
-                    with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
-                        yf_ticker = yf.Ticker(ticker)
-                        # 30년 역사 데이터 수집
-                        hist = yf_ticker.history(start="1996-01-01", timeout=TIMEOUT_SEC)
-                    for date_val, row in hist.iterrows():
-                        date_str = date_val.strftime("%Y-%m-%d")
-                        new_records.append({"Date": date_str, "Close": float(row["Close"])})
-                except Exception:
-                    pass
+            new_records = _fetch_yfinance(ticker, start="1996-01-01")
         else:
             # 증분 수집 (Incremental Update)
             last_date = datetime.strptime(last_date_str, "%Y-%m-%d")
             today = datetime.today()
 
             if last_date.date() <= today.date():
-                if is_korean_bond:
-                    today_records = _scrape_naver_bond(naver_cd, pages=1)
-                    for rec in today_records:
-                        rec_date = datetime.strptime(rec["Date"], "%Y-%m-%d")
-                        if rec_date.date() > last_date.date():
-                            new_records.append(rec)
-                else:
-                    try:
-                        # 오늘이 이미 캐시에 있으면 오늘부터 재조회 (intraday 갱신)
-                        start_date = last_date if last_date.date() == today.date() else last_date + timedelta(days=1)
-                        start_str = start_date.strftime("%Y-%m-%d")
-                        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
-                            yf_ticker = yf.Ticker(ticker)
-                            hist = yf_ticker.history(start=start_str, timeout=TIMEOUT_SEC)
-                        for date_val, row in hist.iterrows():
-                            date_str = date_val.strftime("%Y-%m-%d")
-                            new_records.append({"Date": date_str, "Close": float(row["Close"])})
-                    except Exception:
-                        pass
+                # 오늘이 이미 캐시에 있으면 오늘부터 재조회 (intraday 갱신)
+                start_date = last_date if last_date.date() == today.date() else last_date + timedelta(days=1)
+                new_records = _fetch_yfinance(ticker, start=start_date.strftime("%Y-%m-%d"))
 
         # new_records가 기존 날짜를 덮어쓰도록 최신 데이터 우선 병합
         date_to_close: dict[str, float] = {r["Date"]: r["Close"] for r in existing_data}
@@ -174,14 +167,7 @@ class MarketDataCollector:
 
         # 신규 데이터가 수집되었을 때만 파일에 쓰기 수행
         if new_records:
-            try:
-                with open(csv_path, "w", encoding="utf-8", newline="") as f:
-                    writer = csv.DictWriter(f, fieldnames=["Date", "Close"])
-                    writer.writeheader()
-                    for r in unique_combined:
-                        writer.writerow(r)
-            except Exception:
-                pass
+            _write_cache(csv_path, unique_combined)
 
         return unique_combined
 
@@ -200,6 +186,7 @@ class MarketDataCollector:
                 date=last["Date"],
                 available=True,
                 stale_days=_days_since(last["Date"]),
+                stale_threshold=_stale_threshold(history),
             )
         elif len(history) == 1:
             last = history[-1]
@@ -211,6 +198,7 @@ class MarketDataCollector:
                 date=last["Date"],
                 available=True,
                 stale_days=_days_since(last["Date"]),
+                stale_threshold=_stale_threshold(history),
             )
         else:
             return MarketIndex(

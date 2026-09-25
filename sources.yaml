@@ -222,10 +222,9 @@ market_data:
     - { ticker: "^DJI", name: "다우존스" }
     - { ticker: "^GSPC", name: "S&P 500" }
     - { ticker: "^IXIC", name: "NASDAQ" }
-    # 주의: 국고채는 네이버 marketindex가 이전(stock.naver.com 개편)하면서 소스가 죽었다.
-    # interestDailyQuote.naver가 410을 반환해 새 데이터가 들어오지 않고, 캐시된 마지막 값이
-    # 카드에 "⚠️ N일 전" 표시와 함께 나온다. 살리려면 한국은행 ECOS API 키가 필요하다.
-    - { ticker: "KR_BOND_3Y", name: "국고채 3년" }
+    # 국고채는 네이버 marketindex 이전(410)으로 소스가 죽어 FRED(OECD 장기금리)로 교체했다.
+    # 키가 필요 없고 2026-08까지 갱신된다. 다만 월간이라 일간 등락은 의미가 없다.
+    - { ticker: "FRED:IRLTLT01KRM156N", name: "국고채 10년 (월간)" }
     - { ticker: "^TNX", name: "미국채 10년" }
     - { ticker: "^TYX", name: "미국채 30년" }
     - { ticker: "DX-Y.NYB", name: "달러인덱스" }

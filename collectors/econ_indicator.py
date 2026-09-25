@@ -8,6 +8,7 @@ import requests
 import yfinance as yf
 
 from .base import CollectorResult
+from .fred import fetch_series
 
 TIMEOUT_SEC = 10
 _HEADERS = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"}
@@ -112,4 +113,55 @@ class EconIndicatorCollector:
         else:
             result.econ_indicators.append({"name": "실업률", "value": None, "prev": None, "unit": "%", "date": None})
 
+        result.econ_indicators.extend(self._fred_indicators())
+
         return result
+
+    def _fred_indicators(self) -> list[dict]:
+        """FRED에서 키 없이 가져오는 지표들.
+
+        T-Bill은 기준금리 프록시일 뿐이라 실제 정책금리를 따로 보여주고,
+        물가·고용은 연준이 보는 지표라 금리 판단의 근거가 된다.
+        """
+        indicators = []
+
+        # 미국 기준금리 (실제 정책금리)
+        fedfunds = fetch_series("FEDFUNDS")
+        if fedfunds:
+            indicators.append(self._make(
+                "미국 기준금리", round(float(fedfunds[-1]["Close"]), 2),
+                round(float(fedfunds[-2]["Close"]), 2) if len(fedfunds) >= 2 else None,
+                "%", fedfunds[-1]["Date"][:7],
+            ))
+
+        # 근원 CPI YoY (식료품·에너지 제외 — 연준이 더 중시)
+        core = fetch_series("CPILFESL")
+        indicators.append(self._yoy(core, "근원 CPI (YoY)"))
+
+        # 비농업 신규고용 MoM (레벨 차분, 단위: 천명)
+        payrolls = fetch_series("PAYEMS")
+        if len(payrolls) >= 3:
+            change = round(float(payrolls[-1]["Close"]) - float(payrolls[-2]["Close"]), 0)
+            prev_change = round(float(payrolls[-2]["Close"]) - float(payrolls[-3]["Close"]), 0)
+            indicators.append(self._make("비농업 고용 (MoM)", change, prev_change, "천명", payrolls[-1]["Date"][:7]))
+        else:
+            indicators.append(self._make("비농업 고용 (MoM)", None, None, "천명", None))
+
+        return indicators
+
+    def _yoy(self, series: list[dict], name: str) -> dict:
+        """전년 동월 대비 증가율. 13개월치가 없으면 값을 비운다."""
+        if len(series) < 13:
+            return self._make(name, None, None, "%", None)
+        try:
+            current = float(series[-1]["Close"])
+            year_ago = float(series[-13]["Close"])
+            prev_yoy = round((float(series[-2]["Close"]) - float(series[-14]["Close"])) / float(series[-14]["Close"]) * 100, 1) if len(series) >= 14 else None
+            return self._make(
+                name, round((current - year_ago) / year_ago * 100, 1), prev_yoy, "%", series[-1]["Date"][:7]
+            )
+        except (ZeroDivisionError, KeyError, ValueError):
+            return self._make(name, None, None, "%", None)
+
+    def _make(self, name: str, value, prev, unit: str, date: str | None) -> dict:
+        return {"name": name, "value": value, "prev": prev, "unit": unit, "date": date}
