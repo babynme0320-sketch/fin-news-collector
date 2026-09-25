@@ -92,7 +92,8 @@ class MarketIndex:
     change_pct: float
     date: str
     available: bool = True
-    stale_days: int = 0  # 마지막 데이터가 며칠 전인지 (0이면 최신)
+    stale_days: int = 0      # 마지막 데이터가 며칠 전인지 (0이면 최신)
+    stale_threshold: int = 3  # 이 일수를 넘으면 "멈춘 지표"로 본다 (지표 주기에 따라 달라짐)
 
 
 @dataclass

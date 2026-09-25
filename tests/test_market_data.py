@@ -109,3 +109,59 @@ def test_market_index_flags_stale_series():
 
     assert stale.stale_days == 8
     assert current.stale_days == 0
+
+
+def test_stale_threshold_scales_with_series_cadence():
+    """일간 지표에 3일, 월간 지표에 3일을 그대로 쓰면 월간은 매번 경고가 뜬다."""
+    from datetime import date, timedelta
+    from collectors.market_data import _stale_threshold
+
+    daily = [
+        {"Date": (date.today() - timedelta(days=n)).strftime("%Y-%m-%d"), "Close": 1.0}
+        for n in range(30, -1, -1)
+    ]
+    monthly = [
+        {"Date": (date.today() - timedelta(days=30 * n)).strftime("%Y-%m-%d"), "Close": 1.0}
+        for n in range(30, -1, -1)
+    ]
+
+    assert _stale_threshold(daily) == 3
+    # 월간(30일 간격)은 90일까지 봐준다
+    assert _stale_threshold(monthly) == 90
+
+
+def test_stale_threshold_falls_back_without_enough_history():
+    from collectors.market_data import _stale_threshold
+
+    assert _stale_threshold([]) == 3
+    assert _stale_threshold([{"Date": "2026-09-25", "Close": 1.0}]) == 3
+
+
+def test_fred_ticker_reads_from_fred(monkeypatch, tmp_path):
+    """FRED 시리즈는 증분 없이 통째로 받아 캐시를 덮어쓴다."""
+    from collectors import market_data
+
+    monkeypatch.setattr(market_data, "CACHE_DIR", tmp_path)
+    monkeypatch.setattr(market_data, "fetch_series", lambda sid: [
+        {"Date": "2026-07-01", "Close": 4.1},
+        {"Date": "2026-08-01", "Close": 4.29},
+    ])
+
+    collector = market_data.MarketDataCollector({})
+    history = collector._load_and_update_cache({"ticker": "FRED:IRLTLT01KRM156N", "name": "국고채 10년"})
+
+    assert [r["Close"] for r in history] == [4.1, 4.29]
+    assert (tmp_path / "FRED:IRLTLT01KRM156N.csv").exists()
+
+
+def test_fred_ticker_falls_back_to_cache_when_fetch_fails(monkeypatch, tmp_path):
+    from collectors import market_data
+
+    monkeypatch.setattr(market_data, "CACHE_DIR", tmp_path)
+    (tmp_path / "FRED:TEST.csv").write_text("Date,Close\n2026-08-01,4.29\n", encoding="utf-8")
+    monkeypatch.setattr(market_data, "fetch_series", lambda sid: [])
+
+    collector = market_data.MarketDataCollector({})
+    history = collector._load_and_update_cache({"ticker": "FRED:TEST", "name": "테스트"})
+
+    assert history == [{"Date": "2026-08-01", "Close": 4.29}]
